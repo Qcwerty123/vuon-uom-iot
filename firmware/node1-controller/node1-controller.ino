@@ -1,0 +1,100 @@
+/*
+ * node1-controller.ino — Firmware chính Node 1 (điều khiển) · Hệ thống chăm sóc vườn ươm
+ *
+ * Đặc tả: docs/dac-ta-he-thong.md §6 (firmware), §8 (MQTT).
+ * Board: NodeMCU-32S · Partition: Default · Serial Monitor 115200, New Line.
+ * Thư viện: PubSubClient, ArduinoJson 7, DHT sensor library (+ Adafruit Unified Sensor),
+ *           BH1750 (Christopher Laws), Keypad, U8g2 — phiên bản theo firmware/LIBRARIES.md.
+ *
+ * Trước khi nạp: tạo tab secrets.h từ secrets.example.h (KHÔNG commit secrets.h).
+ *
+ * Các tab:
+ *   app.h            hằng số, gán chân, kiểu dữ liệu chung
+ *   config_store.*   cấu hình + seq lưu NVS
+ *   sensors.*        đọc, lọc, phát hiện lỗi, hợp nhất 2 cảm biến đất
+ *   control.*        tưới, quạt, AUTO/MANUAL/LOCAL, khóa an toàn
+ *   net.*            WiFi, NTP, MQTT
+ *   protocol.*       telemetry/status/event/ack, xử lý command/config
+ *   buffer.*         hàng đợi 200 bản ghi khi mất mạng
+ *   ui.*             OLED + keypad
+ */
+#include "app.h"
+#include "config_store.h"
+#include "sensors.h"
+#include "control.h"
+#include "net.h"
+#include "protocol.h"
+#include "buffer.h"
+#include "ui.h"
+
+static const uint32_t LOG_PERIOD_MS = 10000;
+static uint32_t nextLog = 0;
+static char serialLine[32];
+static uint8_t serialLen = 0;
+
+static void printHelp() {
+  Serial.println("Lenh Serial: s = cam bien | c = cau hinh | n = mang | h = tro giup | factory = xoa cau hinh");
+}
+
+static void runSerialCommand(const char* cmd) {
+  if (strcmp(cmd, "s") == 0) sensorsPrint();
+  else if (strcmp(cmd, "c") == 0) configPrint();
+  else if (strcmp(cmd, "n") == 0) netPrint();
+  else if (strcmp(cmd, "h") == 0) printHelp();
+  else if (strcmp(cmd, "factory") == 0) {
+    configFactoryReset();
+    configSave();
+    Serial.println("Da ve cau hinh mac dinh, khoi dong lai...");
+    controlAllOff();
+    delay(200);
+    ESP.restart();
+  } else if (cmd[0]) {
+    Serial.printf("Khong hieu lenh '%s'\n", cmd);
+    printHelp();
+  }
+}
+
+static void serialLoop() {
+  while (Serial.available()) {
+    char ch = Serial.read();
+    if (ch == '\r') continue;
+    if (ch == '\n') {
+      serialLine[serialLen] = 0;
+      runSerialCommand(serialLine);
+      serialLen = 0;
+    } else if (serialLen < sizeof(serialLine) - 1) {
+      serialLine[serialLen++] = ch;
+    }
+  }
+}
+
+void setup() {
+  controlBegin();            // tắt relay trước mọi việc khác
+  Serial.begin(115200);
+  delay(200);
+  Serial.printf("\n== Node 1 dieu khien · fw %s · hw %s ==\n", FW_VERSION, HW_VERSION);
+  configBegin();
+  controlLoadMode();
+  configPrint();
+  sensorsBegin();
+  uiBegin();
+  netBegin();
+  protocolBegin();
+  printHelp();
+}
+
+void loop() {
+  netLoop();
+  sensorsLoop();
+  controlLoop();
+  protocolLoop();
+  uiLoop();
+  serialLoop();
+  uint32_t now = millis();
+  if ((int32_t)(now - nextLog) >= 0) {
+    nextLog = now + LOG_PERIOD_MS;
+    Serial.printf("[%lus] %s bom=%d quat=%d dem=%u | ", (unsigned long)(now / 1000), modeName(),
+                  pumpIsOn(), fanIsOn(), bufCount());
+    sensorsPrint();
+  }
+}

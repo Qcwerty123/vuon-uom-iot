@@ -1,0 +1,65 @@
+# docker-compose.yml — chạy từ thư mục deployment/
+#   docker compose up -d db mosquitto
+# Các dịch vụ backend / ai / web để comment: bỏ comment khi thư mục tương ứng đã có Dockerfile.
+
+name: vuon-uom
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      TZ: Asia/Ho_Chi_Minh
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+      - ../database/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:5432:5432"      # chỉ mở cho máy chủ (công cụ quản trị CSDL), không mở ra LAN
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    ports:
+      - "1883:1883"                # thiết bị trong LAN kết nối vào đây
+      # - "8883:8883"              # bật khi cấu hình TLS
+    volumes:
+      - ./mosquitto/config:/mosquitto/config:ro
+      - ./mosquitto/data:/mosquitto/data
+
+  # ai:
+  #   build: ../backend/ai-service
+  #   restart: unless-stopped
+  #   env_file: ../.env
+  #   volumes:
+  #     - ../backend/ai-service/models:/models:ro
+
+  # backend:
+  #   build: ../backend/api
+  #   restart: unless-stopped
+  #   env_file: ../.env
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+  #     mosquitto:
+  #       condition: service_started
+  #   volumes:
+  #     - images:/data/images
+
+  # web:
+  #   build: ../frontend            # Nginx: bản build + proxy /api, /ws; cổng 80 chỉ proxy /device-api/, còn lại chuyển 443
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   depends_on:
+  #     - backend
+
+volumes:
+  dbdata: {}
+  images: {}

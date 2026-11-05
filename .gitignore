@@ -1,0 +1,45 @@
+# ---------- Bí mật: KHÔNG BAO GIỜ commit ----------
+.env
+.env.*
+!.env.example
+**/secrets.h
+*.pem
+*.key
+*.crt
+*.p12
+
+# ---------- Dữ liệu sinh ra khi chạy ----------
+deployment/mosquitto/data/*
+!deployment/mosquitto/data/.gitkeep
+deployment/mosquitto/log/
+deployment/images/
+deployment/backups/
+
+# ---------- AI: dataset và trọng số lớn ----------
+backend/ai-service/data/
+backend/ai-service/models/*
+!backend/ai-service/models/.gitkeep
+*.h5
+*.keras
+*.tflite
+*.onnx
+*.pt
+
+# ---------- Build / dependency ----------
+**/.pio/
+**/build/
+node_modules/
+dist/
+target/
+__pycache__/
+*.pyc
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# ---------- IDE / hệ điều hành ----------
+.vscode/
+.idea/
+*.iml
+.DS_Store
+Thumbs.db

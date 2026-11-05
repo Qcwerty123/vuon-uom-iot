@@ -1,0 +1,10 @@
+# Dịch vụ suy luận
+fastapi
+uvicorn[standard]
+python-multipart
+pillow
+numpy
+tensorflow-cpu
+# Huấn luyện / đánh giá (chạy trong notebook)
+scikit-learn
+matplotlib

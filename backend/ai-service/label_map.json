@@ -1,0 +1,27 @@
+{
+  "_ghi_chu": "Gộp nhãn gốc về 3 lớp — đặc tả §15.2. Nhóm rà lại sau khi xem ảnh thật (C8).",
+  "classes": ["HEALTHY", "YELLOW", "SPOT"],
+  "unknown_threshold": 0.6,
+  "plantvillage": {
+    "Tomato___healthy": "HEALTHY",
+    "Tomato___Tomato_Yellow_Leaf_Curl_Virus": "YELLOW",
+    "Tomato___Leaf_Mold": "YELLOW",
+    "Tomato___Spider_mites Two-spotted_spider_mite": "YELLOW",
+    "Tomato___Tomato_mosaic_virus": "YELLOW",
+    "Tomato___Bacterial_spot": "SPOT",
+    "Tomato___Early_blight": "SPOT",
+    "Tomato___Late_blight": "SPOT",
+    "Tomato___Septoria_leaf_spot": "SPOT",
+    "Tomato___Target_Spot": "SPOT"
+  },
+  "plantdoc": {
+    "Tomato leaf": "HEALTHY",
+    "Tomato leaf yellow virus": "YELLOW",
+    "Tomato mold leaf": "YELLOW",
+    "Tomato leaf mosaic virus": "YELLOW",
+    "Tomato leaf bacterial spot": "SPOT",
+    "Tomato Early blight leaf": "SPOT",
+    "Tomato leaf late blight": "SPOT",
+    "Tomato Septoria leaf spot": "SPOT"
+  }
+}
