@@ -94,3 +94,30 @@ def events(device_id: int, type: str | None = None, frm: datetime | None = Query
     if type:
         q = q.where(DeviceEvent.type == type)
     return [{"id": e.id, "seq": e.seq, "type": e.type, "detail": e.detail, "ts": e.ts} for e in db.scalars(q)]
+
+
+@router.get("/telemetry/export.csv")
+def export_csv(device_id: int, frm: datetime | None = Query(None, alias="from"), to: datetime | None = None,
+               user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Xuất CSV dạng dài (ts, metric, value, unit, ok, seq); tối đa 31 ngày (§10.6)."""
+    import csv
+    import io
+
+    from fastapi.responses import StreamingResponse
+
+    dev, _ = device_for_view(db, user, device_id)
+    frm, to = _range(frm, to, 24)
+    if to - frm > timedelta(days=31):
+        raise ApiError(400, "VALIDATION_ERROR", "Khoảng xuất tối đa 31 ngày")
+    rows = db.execute(select(Telemetry.ts, Telemetry.metric, Telemetry.value, Telemetry.unit, Telemetry.ok, Telemetry.seq)
+                      .where(Telemetry.device_id == device_id, Telemetry.ts >= frm, Telemetry.ts <= to)
+                      .order_by(Telemetry.ts, Telemetry.metric)).all()
+    buf = io.StringIO()
+    buf.write("﻿")  # BOM để Excel đọc đúng tiếng Việt
+    w = csv.writer(buf)
+    w.writerow(["ts", "metric", "value", "unit", "ok", "seq"])
+    for r in rows:
+        w.writerow([r.ts.isoformat(), r.metric, r.value, r.unit, r.ok, r.seq])
+    name = f"{dev.device_code}_{frm:%Y%m%d%H%M}_{to:%Y%m%d%H%M}.csv"
+    return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv; charset=utf-8",
+                             headers={"Content-Disposition": f'attachment; filename="{name}"'})

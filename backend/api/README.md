@@ -30,7 +30,21 @@
 Auth + khóa tạm khi sai 5 lần, refresh rotation; `/users/me`; thiết bị: danh sách, chi tiết, đăng ký, sửa, cấp phát (secret một lần),
 cấp lại khóa, khóa, mở khóa, thu hồi, lịch sử, gán quyền; telemetry latest/series/stats; events; WebSocket; audit.
 
-## Chưa có (WP-03)
+## Đã có (WP-03)
 
-Lệnh + ack + timeout, cấu hình (quy tắc phiên bản §9.3), OfflineDetector/FaultDetector, bảo trì, cảnh báo + Telegram,
-quản lý người dùng cho admin, đọc audit, xử lý `seq` bị tụt (§8.10), ảnh + chẩn đoán (WP-07). Alembic: chưa dùng, schema lấy từ `database/init`.
+- Lệnh: `POST/GET /devices/{id}/commands`, `GET /commands/{cmdId}` — kiểm tra quyền CONTROL (thiếu quyền ghi audit `COMMAND_DENIED`),
+  trạng thái + online (409), tham số theo loại thiết bị (400), 10 lệnh/phút (429); ack → EXECUTED/REJECTED/FAILED; 10 s không ack → TIMEOUT.
+- Cấu hình: `GET/PUT /devices/{id}/config`, `/config/history` — kiểm tra miền giá trị, phiên bản = max(CSDL, thiết bị báo) + 1 (§9.3),
+  gửi retain, ack `cfg-N` → APPLIED/REJECTED, chưa ack sau 60 s thì gửi lại.
+- Bảo trì: `POST /devices/{id}/maintenance`, `/maintenance/end`.
+- Tác vụ nền (`app/jobs.py`): CommandTimeout 2 s, OfflineDetector 15 s (> 90 s), ConfigRetry 30 s, FaultDetector 60 s, HourlyRollup.
+- Cảnh báo (`app/alerts.py`): THRESHOLD (duy trì `durationS`, trễ `hysteresis`), OFFLINE (tự đóng khi online lại), EVENT (tank_low, sensor_fault…),
+  chống gửi lặp `cooldownMin`; `GET /alerts`, `acknowledge`, `close`; `/alert-rules` (ADMIN ghi; xóa = tắt).
+- Telegram (`app/telegram.py`): gửi cho admin và người được gán có `telegramChatId`; thiết bị đang bảo trì không gửi. Nhắn `/start` cho bot để lấy chat id.
+- Người dùng (ADMIN): `GET/POST /users`, `PATCH /users/{id}`, `lock`, `unlock`, `activate`, `reset-password`. Audit: `GET /audit-logs`. `GET /dashboard/summary`.
+- Xuất CSV: `GET /devices/{id}/telemetry/export.csv`.
+- Kiểm thử: `scripts\windows\test-backend.ps1 -Wp 03`.
+
+## Chưa có
+
+Ảnh + chẩn đoán + luật AI_LEAF (WP-07), xử lý `seq` bị tụt (§8.10), Retention, Alembic (schema lấy từ `database/init`).

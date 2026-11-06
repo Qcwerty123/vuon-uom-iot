@@ -175,3 +175,48 @@ class AuditLog(Base):
     ip: Mapped[str | None] = mapped_column(INET)
     success: Mapped[bool] = mapped_column(Boolean, default=True)
     at: Mapped[datetime] = mapped_column(TS, server_default="now()")
+
+
+AlertSev = pg_enum("alert_sev", "INFO", "WARNING", "CRITICAL")
+AlertStatus = pg_enum("alert_status", "OPEN", "ACKNOWLEDGED", "CLOSED")
+
+
+class AlertRule(Base):
+    __tablename__ = "alert_rules"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    type: Mapped[str] = mapped_column(String(20))
+    scope_zone_id: Mapped[int | None] = mapped_column(ForeignKey("zones.id"))
+    scope_device_id: Mapped[int | None] = mapped_column(ForeignKey("devices.id"))
+    metric: Mapped[str | None] = mapped_column(String(20))
+    operator: Mapped[str | None] = mapped_column(String(2))
+    threshold: Mapped[float | None] = mapped_column(Float)
+    hysteresis: Mapped[float | None] = mapped_column(Float, default=0)
+    duration_s: Mapped[int] = mapped_column(Integer, default=0)
+    event_type: Mapped[str | None] = mapped_column(String(30))
+    severity: Mapped[str] = mapped_column(AlertSev, default="WARNING")
+    cooldown_min: Mapped[int] = mapped_column(Integer, default=30)
+    notify_telegram: Mapped[bool] = mapped_column(Boolean, default=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(TS, server_default="now()")
+
+
+class Alert(Base):
+    __tablename__ = "alerts"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    rule_id: Mapped[int | None] = mapped_column(ForeignKey("alert_rules.id"))
+    device_id: Mapped[int] = mapped_column(ForeignKey("devices.id"))
+    type: Mapped[str] = mapped_column(String(20))
+    severity: Mapped[str] = mapped_column(AlertSev)
+    message: Mapped[str] = mapped_column(String(300))
+    context: Mapped[dict | None] = mapped_column(JSONB)
+    status: Mapped[str] = mapped_column(AlertStatus, default="OPEN")
+    opened_at: Mapped[datetime] = mapped_column(TS, server_default="now()")
+    condition_cleared_at: Mapped[datetime | None] = mapped_column(TS)
+    ack_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    ack_at: Mapped[datetime | None] = mapped_column(TS)
+    closed_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    closed_at: Mapped[datetime | None] = mapped_column(TS)
+    close_note: Mapped[str | None] = mapped_column(String(300))
+    notified_at: Mapped[datetime | None] = mapped_column(TS)

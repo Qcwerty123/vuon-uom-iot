@@ -13,7 +13,7 @@ import paho.mqtt.client as mqtt
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 
-from . import realtime
+from . import alerts, realtime
 from .audit import audit
 from .config import settings
 from .db import session_scope
@@ -60,6 +60,7 @@ def _mark_seen(db, dev: Device, retained: bool = False) -> None:
         dev.last_seen_at = now
     if not dev.online:
         dev.online = True
+        alerts.on_online(db, dev)
     if dev.status == "PROVISIONED":
         dev.first_seen_at = dev.first_seen_at or now
         transition(db, dev, "ACTIVE", "Kết nối lần đầu", strict=False)
@@ -144,6 +145,7 @@ def _telemetry(db, dev: Device, b: dict) -> None:
     state = b.get("state") if isinstance(b.get("state"), dict) else {}
     latest_state[dev.id] = state
     _mark_seen(db, dev)
+    alerts.on_telemetry(db, dev, out)
     realtime.publish(dev.id, {"type": "telemetry", "deviceId": dev.id, "ts": ts.isoformat(), "seq": seq,
                               "buffered": bool(b.get("buffered")), "data": out, "state": state})
 
@@ -156,7 +158,10 @@ def _status(db, dev: Device, b: dict, retained: bool) -> None:
                 transition(db, dev, "OFFLINE", "Nhận LWT (mất kết nối)", strict=False)
             realtime.publish(dev.id, {"type": "device_status", "deviceId": dev.id, "status": dev.status,
                                       "online": False, "lastSeenAt": _iso(dev.last_seen_at)})
+            alerts.on_offline(db, dev)
         return
+    if isinstance(b.get("config_version"), int) and not retained:
+        dev.current_config_version = max(dev.current_config_version or 0, b["config_version"])
     if b.get("fw"):
         dev.fw_version = str(b["fw"])[:30]
     if b.get("hw"):
@@ -180,6 +185,7 @@ def _event(db, dev: Device, b: dict) -> None:
                      .on_conflict_do_nothing(index_elements=["device_id", "seq"]))
     _mark_seen(db, dev)
     if res.rowcount:
+        alerts.on_event(db, dev, typ, detail)
         realtime.publish(dev.id, {"type": "device_event", "deviceId": dev.id, "ts": ts.isoformat(),
                                   "eventType": typ, "detail": detail})
 

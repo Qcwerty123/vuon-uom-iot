@@ -7,7 +7,8 @@ tưới/thông gió tự động như firmware §6.5–§6.6. Dùng để phát 
 phần cứng và để đo NFR05, NFR08, NFR09. KHÔNG thay thế thiết bị thật trong demo.
 
 Lệnh (chạy qua scripts/windows/sim.ps1, tham số giống hệt):
-  provision --count 3 [--start 9001] [--garden g01]   tạo tài khoản broker ctl-9001.. (lưu runtime/sim/devices.json)
+  register --count 1                                   đăng ký + cấp phát qua backend API (thiết bị hiện trên web) — dùng cái này khi đã có backend
+  provision --count 3 [--start 9001] [--garden g01]   chỉ tạo tài khoản broker ctl-9001.. (khi chưa có backend)
   deprovision                                          xóa các tài khoản đã tạo
   run [--codes ctl-9001,ctl-9002] [--interval 10] [--duplicate-rate 0.05] [--drop-rate 0.02]
       [--offline-every 0 --offline-for 30] [--soil 45 --tank 80]
@@ -170,6 +171,29 @@ def cmd_provision(a) -> None:
         devs[code] = {"secret": secret, "garden": a.garden}
         log(f"{code}: đã tạo tài khoản broker")
     save_devices(devs)
+
+
+def cmd_register(a) -> None:
+    import urllib.request
+    base = f"http://127.0.0.1:{ENV.get('BACKEND_PORT', '8000')}/api/v1"
+
+    def call(method, path, token=None, body=None):
+        req = urllib.request.Request(base + path, data=json.dumps(body).encode() if body is not None else None,
+                                     method=method, headers={"Content-Type": "application/json"})
+        if token:
+            req.add_header("Authorization", f"Bearer {token}")
+        with urllib.request.urlopen(req, timeout=15) as r:
+            return json.loads(r.read() or b"{}")
+
+    tok = call("POST", "/auth/login", body={"username": "admin", "password": ENV["SEED_ADMIN_PASSWORD"]})["accessToken"]
+    devs = load_devices()
+    for i in range(a.count):
+        d = call("POST", "/devices", tok, {"type": "CONTROLLER", "name": f"Thiết bị mô phỏng {i + 1}", "zoneId": a.zone})
+        p = call("POST", f"/devices/{d['id']}/provision", tok)
+        devs[p["deviceCode"]] = {"secret": p["secret"], "garden": p["gardenCode"], "id": d["id"]}
+        log(f"{p['deviceCode']} (id {d['id']}): đã đăng ký + cấp phát qua backend")
+    save_devices(devs)
+    log("Chạy: sim.ps1 run --codes " + ",".join(k for k, v in devs.items() if "id" in v))
 
 
 def cmd_deprovision(_a) -> None:
@@ -471,6 +495,8 @@ class SimDevice:
         log(f"{self.code}: ack {kind} {cmd_id} -> {result}")
 
     def handle_command(self, b: dict) -> None:
+        if getattr(self, "ignore_commands", False):  # kiểm thử TIMEOUT
+            return
         cid, action = str(b.get("cmd_id") or ""), b.get("action") or ""
         if not cid or len(cid) >= 40:
             return
@@ -734,6 +760,7 @@ def main() -> None:
     p = sp.add_parser("provision"); p.add_argument("--count", type=int, default=1)
     p.add_argument("--start", type=int, default=9001); p.add_argument("--garden", default="g01")
     sp.add_parser("deprovision")
+    p = sp.add_parser("register"); p.add_argument("--count", type=int, default=1); p.add_argument("--zone", type=int, default=1)
     p = sp.add_parser("run"); p.add_argument("--codes", default="")
     p.add_argument("--interval", type=float, default=None, help="ghi đè telemetry_interval_s")
     p.add_argument("--duplicate-rate", type=float, default=0.0); p.add_argument("--drop-rate", type=float, default=0.0)
@@ -749,7 +776,7 @@ def main() -> None:
     a = ap.parse_args()
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     _log_file = open(LOG_DIR / f"simulator-{time.strftime('%Y%m%d')}.log", "a", encoding="utf-8")
-    {"provision": cmd_provision, "deprovision": cmd_deprovision, "run": cmd_run, "watch": cmd_watch,
+    {"provision": cmd_provision, "register": cmd_register, "deprovision": cmd_deprovision, "run": cmd_run, "watch": cmd_watch,
      "cmd": cmd_cmd, "config": cmd_config}[a.cmd](a)
 
 

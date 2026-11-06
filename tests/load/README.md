@@ -15,7 +15,8 @@ Dùng để: phát triển backend/web khi chưa có phần cứng; đo NFR05 (m
 Lần đầu `sim.ps1` tự tạo `tests/load/.venv` bằng Python trong `tools/` và cài `paho-mqtt`.
 
 ```powershell
-.\scripts\windows\sim.ps1 provision --count 1        # tạo tài khoản broker ctl-9001 (Dynamic Security)
+.\scripts\windows\sim.ps1 register --count 1         # khi backend đang chạy: đăng ký + cấp phát qua API (hiện trên web)
+.\scripts\windows\sim.ps1 provision --count 1        # khi chưa có backend: chỉ tạo tài khoản broker ctl-9001
 .\scripts\windows\sim.ps1 run                         # chạy các thiết bị đã tạo; Ctrl+C để dừng
 .\scripts\windows\sim.ps1 watch                       # cửa sổ khác: xem bản tin như backend
 .\scripts\windows\sim.ps1 cmd ctl-9001 pump_on --duration 5

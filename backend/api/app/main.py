@@ -15,10 +15,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
-from . import errors, ingest, realtime, seed
+from . import commands, errors, ingest, jobs, realtime, seed, telegram  # noqa: F401 — commands đăng ký xử lý ack
 from .config import REPO, settings
 from .db import engine
-from .routers import auth, devices, telemetry
+from .routers import admin, alerts, auth, control, devices, telemetry
 
 
 def _setup_logging() -> None:
@@ -48,14 +48,17 @@ async def lifespan(_app: FastAPI):
         c.execute(text("select 1"))
     seed.run()
     ingest.start()
+    jobs.start()
+    telegram.start_bot()
     schemes = list(_app.openapi().get("components", {}).get("securitySchemes", {}))
     log.info("Backend đã khởi động (OpenAPI security: %s)", schemes)
     yield
+    jobs.stop()
     ingest.stop()
     log.info("Backend dừng")
 
 
-app = FastAPI(title="Vườn ươm thông minh — API", version="0.2.0", lifespan=lifespan,
+app = FastAPI(title="Vườn ươm thông minh — API", version="0.3.0", lifespan=lifespan,
               docs_url="/docs", openapi_url="/api/v1/openapi.json")
 errors.install(app)
 app.add_middleware(CORSMiddleware, allow_origins=[settings.public_origin, "http://localhost:5173",
@@ -75,6 +78,9 @@ api = APIRouter(prefix="/api/v1")
 api.include_router(auth.router)
 api.include_router(devices.router)
 api.include_router(telemetry.router)
+api.include_router(control.router)
+api.include_router(alerts.router)
+api.include_router(admin.router)
 
 
 @api.get("/health", tags=["system"])

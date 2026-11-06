@@ -7,6 +7,7 @@ Mỗi file `WP-xx-*.md` là một gói việc tự đủ để một agent hoặ
 | WP-00 | Triển khai nền tảng trên Windows: công cụ portable, CSDL, broker, script vận hành | **Xong 06/11** — `logs/agent/WP-00-report.md` |
 | WP-01 | Thiết bị mô phỏng Node 1 (`tests/load/simulator.py`, `scripts/windows/sim.ps1`) | **Xong 06/11** (đã chạy thử: lệnh, cấu hình, ack ~15 ms) |
 | WP-02 | Backend lõi FastAPI (`backend/api`): auth, thiết bị + cấp phát dynsec, ingest, WebSocket | **Xong 06/11** — `test-backend.ps1` đạt 24/24 |
+| WP-03 | Backend nghiệp vụ: lệnh, cấu hình, offline, cảnh báo + Telegram, người dùng, audit | **Xong 06/11** — `test-backend.ps1 -Wp 03` đạt 35/35 |
 | WP-04 | Frontend React (`frontend/`) | Giao việc 06/11 — `WP-04-frontend.md` |
 | WP-N1 | Nối Node 1, Node 2 thật vào hệ thống qua backend | 07/11 — `WP-N1-noi-thiet-bi.md` |
 
