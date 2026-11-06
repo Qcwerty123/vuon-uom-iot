@@ -2,7 +2,7 @@
 
 Đặc tả: `docs/dac-ta-he-thong.md` §16 (màn hình), §10 (API), §10.11 (WebSocket).
 
-Đề xuất: React + Vite + Recharts (hoặc framework nhóm quen). Build ra file tĩnh, phục vụ bằng Nginx trong image `web` (xem `deployment/nginx/README.md`).
+Đề xuất: React + Vite + Recharts (hoặc framework nhóm quen). Build ra file tĩnh (`npm run build`, Node.js portable trong `tools/node`); backend FastAPI phục vụ luôn bản build ở cổng 8000. Không dùng Nginx ở bản demo.
 
 ## Màn hình theo thứ tự ưu tiên
 
@@ -21,4 +21,4 @@
 - Ẩn nút theo vai trò chỉ để tiện dùng. Quyền thật kiểm tra ở backend.
 - Trạng thái luôn có chữ, không chỉ màu ("Online", "Đang chờ", "Bị từ chối: bể cạn").
 - Mất WebSocket: hiện banner, tự kết nối lại, tải lại dữ liệu mới nhất.
-- Có `Dockerfile` (build + Nginx) để bật dịch vụ `web` trong Docker Compose.
+- Gọi API theo đường dẫn tương đối (`/api/v1`, `/ws`) để chạy được với bất kỳ IP máy chủ nào. `Dockerfile` để sau demo.

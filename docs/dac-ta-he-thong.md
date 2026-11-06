@@ -1,6 +1,8 @@
 # Đặc tả hệ thống — Hệ thống chăm sóc vườn ươm thông minh
 
-> Đồ án kết thúc học phần **IoT và ứng dụng** · Tài liệu đặc tả v1.2 · 04/11/2026 (đã chốt các điểm ở §22, còn mở C8)
+> Đồ án kết thúc học phần **IoT và ứng dụng** · Tài liệu đặc tả v1.3 · 05/11/2026 (đã chốt các điểm ở §22, còn mở C8)
+>
+> **Thay đổi v1.3 (05/11):** chạy trực tiếp trên một máy Windows, không Docker (C21); mọi thứ gói trong thư mục repo (C22); mạng demo là Mobile Hotspot của chính máy chủ, IP cố định `192.168.137.1` (C17); bỏ Nginx và chrony; demo khoảng 18/11 với 2–3 người (C23); thêm 2 quy tắc chống lỗi khi reset CSDL hoặc xóa flash (§8.10, §9.3). Các mục đổi: §1, §6.7, §6.10, §8.9, §8.10, §9.3, §14.2, §17, §18.1, §21, §22, §23.2.
 >
 > Tài liệu này gom toàn bộ phân tích và các quyết định đã chốt, rồi chi tiết hóa tới mức có thể bắt tay vào code: chân GPIO, firmware, MQTT, REST API, schema CSDL, máy trạng thái, bảo mật, AI, triển khai, kiểm thử và demo.
 >
@@ -51,7 +53,7 @@ Hai node ESP32 đặt tại vườn ươm:
 - **Node 1 — điều khiển.** Đo độ ẩm đất (2 điểm), nhiệt độ và độ ẩm không khí, ánh sáng, mực nước bể. Tự tưới và thông gió theo ngưỡng. Có màn hình OLED và keypad để thao tác tại chỗ.
 - **Node 2 — camera ESP32-CAM.** Chụp ảnh khay cây định kỳ hoặc theo lệnh.
 
-Dữ liệu và lệnh đi qua broker MQTT. Ảnh gửi thẳng tới backend qua HTTP. Backend tự xây đảm nhận các việc sau: quản lý người dùng (3 vai trò), vòng đời thiết bị (8 trạng thái), dữ liệu đo, lệnh, cấu hình, cảnh báo (gửi Telegram) và chẩn đoán ảnh lá bằng AI. Web dashboard dùng để giám sát và điều khiển. Toàn bộ phía server chạy bằng Docker Compose trên một máy trong mạng WiFi nội bộ.
+Dữ liệu và lệnh đi qua broker MQTT. Ảnh gửi thẳng tới backend qua HTTP. Backend tự xây đảm nhận các việc sau: quản lý người dùng (3 vai trò), vòng đời thiết bị (8 trạng thái), dữ liệu đo, lệnh, cấu hình, cảnh báo (gửi Telegram) và chẩn đoán ảnh lá bằng AI. Web dashboard dùng để giám sát và điều khiển. Toàn bộ phía server chạy trực tiếp trên một máy Windows (không Docker), gói trong thư mục repo. Chính máy đó phát WiFi cho các node (§17).
 
 ### 1.2. Bảng quyết định
 
@@ -71,7 +73,7 @@ Dữ liệu và lệnh đi qua broker MQTT. Ảnh gửi thẳng tới backend qu
 | D12 | Khóa hoặc thu hồi thiết bị là chặn ở tầng broker (vô hiệu tài khoản MQTT), không chỉ bỏ qua dữ liệu ở backend | Bước 10 của kịch bản demo |
 | D13 | QoS 1 cho lệnh và cấu hình. Chống trùng ở tầng ứng dụng bằng `seq` và `cmd_id` | PubSubClient chỉ publish được QoS 0 |
 | D14 | Thông báo qua Telegram | Miễn phí, dễ tích hợp |
-| D15 | Triển khai Docker Compose, gồm broker, backend, AI service, CSDL, frontend | Một lệnh chạy cả hệ thống |
+| D15 | Triển khai trực tiếp trên một máy Windows bằng script PowerShell, công cụ bản portable trong thư mục repo. Docker Compose để sau (C21) | Chạy được ngay trên máy demo, không thêm lớp ảo hóa; một thư mục chứa toàn bộ hệ thống |
 | D16 | Toàn hệ thống chạy 5 V từ củ sạc, không đấu điện lưới | Quy định an toàn [ĐỀ 10] |
 
 ### 1.3. Công nghệ (đã chốt)
@@ -81,10 +83,11 @@ Dữ liệu và lệnh đi qua broker MQTT. Ảnh gửi thẳng tới backend qu
 | Firmware | Arduino IDE 2 + core "esp32 by Espressif Systems" 3.x | Thư viện ở §6.9, §7.6; cách cài ở `huong-dan-lap-dat-phan-cung.md` §A6. Cả nhóm dùng cùng phiên bản, ghi trong `firmware/LIBRARIES.md` |
 | Broker | Eclipse Mosquitto 2.x + plugin Dynamic Security | Tạo, khóa tài khoản và ACL thiết bị lúc chạy (§8.8) |
 | Backend | **FastAPI** (Python 3.11+). Thư viện đề xuất: SQLAlchemy 2 + Alembic, Pydantic v2, paho-mqtt, passlib/bcrypt, PyJWT | Chốt C1. Cùng ngôn ngữ với AI service và thiết bị mô phỏng |
-| AI service | Python + FastAPI + TensorFlow/Keras (hoặc PyTorch) | Container riêng, tách khỏi backend dù cùng ngôn ngữ: nặng, khởi động chậm, tốn RAM |
-| CSDL | PostgreSQL 16 | Chốt C12: không dùng TimescaleDB. Bảng thường + index + bảng tổng hợp theo giờ |
-| Frontend | React + Vite + thư viện biểu đồ (Recharts hoặc Chart.js) | Hoặc framework nhóm quen |
-| Reverse proxy | Nginx (HTTPS tự ký) | Phục vụ frontend, proxy `/api` và `/ws` |
+| AI service | Python + FastAPI + TensorFlow/Keras (hoặc PyTorch) | Tiến trình riêng (cổng 8001, chỉ 127.0.0.1), tách khỏi backend dù cùng ngôn ngữ: nặng, khởi động chậm, tốn RAM. Huấn luyện trên Google Colab, máy chủ chỉ chạy suy luận |
+| CSDL | PostgreSQL 16 (gói zip portable cho Windows, dữ liệu ở `runtime/pgdata`) | Chốt C12: không dùng TimescaleDB. Bảng thường + index + bảng tổng hợp theo giờ |
+| Frontend | React + Vite + thư viện biểu đồ (Recharts hoặc Chart.js) | Build ra file tĩnh, backend FastAPI phục vụ luôn. Node.js chỉ cần lúc build |
+| Reverse proxy | Không dùng ở bản demo | Backend phục vụ `/api`, `/ws`, trang web và `/device-api` trên cùng cổng 8000. HTTPS là tùy chọn bằng uvicorn + mkcert (C5) |
+| Triển khai | Windows native + script PowerShell (`scripts/windows/`) | C21, C22, §17 |
 
 ---
 
@@ -576,7 +579,7 @@ Khóa an toàn **luôn áp dụng**, ở mọi chế độ và mọi nguồn l�
 ### 6.7. Mạng và độ tin cậy
 
 - **WiFi:** kết nối lại với backoff 1 → 2 → 4 → 8 → 16 → 30 s (tối đa 30 s).
-- **NTP:** đồng bộ lúc khởi động và mỗi 6 giờ. Máy chủ NTP chính là máy server (`MQTT_HOST`, chạy `chrony`), dự phòng `pool.ntp.org` (C11). Chưa có giờ thì `ts=0`, `time_synced=false`; backend dùng `received_at`.
+- **NTP:** đồng bộ lúc khởi động và mỗi 6 giờ với `pool.ntp.org`, qua Internet mà máy chủ chia sẻ vào mạng hotspot (C11). Không chạy máy chủ NTP riêng. Chưa có giờ thì `ts=0`, `time_synced=false`; backend dùng `received_at`.
 - **MQTT:**
   - `clientId = device_code`, `username = device_code`, `password = secret`, `keepalive = 30 s`, `cleanSession = true`.
   - LWT: topic `…/status`, payload `{"online":false,…}`, QoS 1, retain.
@@ -614,7 +617,7 @@ Board: `NodeMCU-32S`. Cách cài và bảng cấu hình menu Tools ở `huong-da
 ```c
 #define WIFI_SSID        "..."
 #define WIFI_PASS        "..."
-#define MQTT_HOST        "192.168.1.10"
+#define MQTT_HOST        "192.168.137.1"   // IP máy chủ trên Mobile Hotspot (C17)
 #define MQTT_PORT        1883
 #define GARDEN_CODE      "g01"
 #define DEVICE_CODE      "ctl-0001"
@@ -841,7 +844,7 @@ X-Cmd-Id: 6f1c2a9e-...        (khi chụp theo lệnh)
 Body: JPEG ≤ 300 KB
 ```
 
-Thiết bị gọi `http://<server>/device-api/v1/images` (cổng 80). Ở cổng 80, Nginx chuyển hướng mọi đường dẫn sang HTTPS, riêng `/device-api/` thì proxy thẳng vào backend (C15). Kênh này cùng mức bảo mật với MQTT 1883 (§14.2).
+Thiết bị gọi `http://192.168.137.1:8000/device-api/v1/images`. Backend FastAPI phục vụ thẳng, không qua proxy (C15). Kênh này cùng mức bảo mật với MQTT 1883 (§14.2).
 
 | Mã | Ý nghĩa |
 |---|---|
@@ -864,6 +867,8 @@ Backend xác thực bằng bcrypt so với `credential_hash`, có cache kết qu
 6. Chống trùng: `INSERT … ON CONFLICT (device_id, seq, metric) DO NOTHING`.
 7. Cập nhật `last_seen_at`. Nếu trạng thái đang Provisioned hoặc Offline thì chuyển Active.
 8. Phát sự kiện nội bộ cho rule engine và WebSocket hub.
+
+**`seq` bị tụt (v1.3).** Nạp lại firmware có chọn "Erase All Flash" làm `seq` bắt đầu lại từ đầu. Khi đó bản tin mới trùng khóa `(device_id, seq, metric)` với dữ liệu cũ và bị bước 6 bỏ âm thầm. Quy tắc: khi nhận event `boot` mà `seq` telemetry tiếp theo nhỏ hơn `seq` lớn nhất đã lưu, backend ghi event `seq_reset`, đẩy cảnh báo INFO và chuyển các bản ghi trùng khóa sang lưu với `seq` dịch thêm một khoảng (`seq + seq_offset`, lưu `seq_offset` trên thiết bị). Cách đơn giản hơn khi phát triển: không chọn "Erase All Flash" khi nạp.
 
 ---
 
@@ -896,6 +901,8 @@ Mỗi sự kiện có 2 nơi nhận:
 - Backend kiểm tra miền giá trị, ví dụ `soil_low < soil_high`, `pump_max_s ≤ 60`.
 - Publish lên `…/config` với retain. Trạng thái bản ghi là `PENDING`, nhận ack thì chuyển `APPLIED` hoặc `REJECTED`.
 - UI hiển thị "Đang chờ thiết bị áp dụng" cho tới khi có ack.
+- **Chọn số phiên bản (v1.3).** Thiết bị lưu `config_version` trong NVS và bỏ qua mọi bản có số nhỏ hơn bản đang dùng. Nếu CSDL bị xóa và tạo lại, số phiên bản ở backend bắt đầu lại từ 1 nên mọi cấu hình mới bị bỏ qua mà không có ack. Quy tắc: phiên bản mới = `max(phiên bản lớn nhất trong CSDL, config_version thiết bị báo trong status) + 1`.
+- **Ack cấu hình** có `cmd_id` dạng `cfg-<version>`, không phải UUID: ingest tách riêng nhánh này để cập nhật `device_configs`, không tra bảng `commands`.
 
 ---
 
@@ -1460,14 +1467,14 @@ Kiểm tra ở 3 điểm:
 | Kiểm tra và làm sạch đầu vào | Schema validation cho REST và MQTT; giới hạn độ dài chuỗi; truy vấn tham số hóa (không ghép chuỗi SQL); escape khi hiển thị; kiểm tra magic bytes JPEG |
 | Khóa, thu hồi thiết bị | dynsec `disableClient`/`deleteClient` + từ chối HTTP upload |
 | Audit log | Danh sách hành động §14.3 |
-| TLS | HTTPS qua Nginx (mkcert) cho web là bắt buộc. Kênh thiết bị (MQTT 1883, `/device-api/` cổng 80) không mã hóa, chạy trên router riêng WPA2, ghi vào phần hạn chế (C5). Chỉ thử MQTT/TLS 8883 khi đủ 10 bước demo |
+| TLS | Bản demo chạy HTTP trong mạng hotspot WPA2 riêng của máy chủ. HTTPS cho web làm sau bằng uvicorn + chứng chỉ mkcert ở một cổng riêng (8443), không cần Nginx. Kênh thiết bị (MQTT 1883, `/device-api/` cổng 8000) không mã hóa, ghi vào phần hạn chế (C5) |
 | Quyền riêng tư | §14.5 |
 
 Bổ sung:
 
 - Giới hạn tần suất: đăng nhập 5 lần/phút/IP, lệnh 10/phút/thiết bị, upload ảnh 1/20 s.
 - CORS chỉ cho origin của frontend.
-- Header bảo mật trong Nginx: `X-Content-Type-Options`, `X-Frame-Options`, `Content-Security-Policy` cơ bản.
+- Header bảo mật bằng middleware của FastAPI: `X-Content-Type-Options`, `X-Frame-Options`, `Content-Security-Policy` cơ bản.
 - Hạn chế đã biết: secret thiết bị đi qua LAN không mã hóa (MQTT CONNECT, Basic auth). Giảm thiểu bằng WiFi riêng và cấp lại khóa sau demo.
 - Hạn chế đã biết: không mã hóa flash, nên người cầm được board có thể đọc secret trong firmware. Khi thu hồi thiết bị: Decommission để secret mất hiệu lực ở broker.
 
@@ -1547,6 +1554,8 @@ Lớp **"Không xác định"** không huấn luyện riêng. Gán khi `max_prob
 
 ### 15.5. Mô hình và huấn luyện
 
+> **Từ 06/11 (C24):** do không đủ thời gian trước demo, bản demo dùng **mô hình tiền huấn luyện công khai trên PlantVillage** (đã có trọng số, không tự huấn luyện). AI service lấy xác suất các lớp cà chua của mô hình đó, gộp về 3 lớp bằng `label_map.json` rồi áp ngưỡng "Không xác định". Yêu cầu khi chọn mô hình: giấy phép cho phép dùng, có các lớp Tomato, chạy được trên CPU, ghi rõ nguồn trong báo cáo. Báo cáo trung thực độ lệch miền: đánh giá trên ảnh Node 2 chụp được (dù ít). Các giai đoạn huấn luyện dưới đây chuyển thành **hướng phát triển**.
+
 - MobileNetV2 (ImageNet), đầu ra: GlobalAveragePooling → Dropout 0,3 → Dense 3 softmax.
 - **Giai đoạn 1 (PlantVillage):** đóng băng backbone, train đầu ra 5 epoch, lr 1e-3. Sau đó mở 30 lớp cuối, lr 1e-4, 5 epoch.
 - **Giai đoạn 2 (PlantDoc):** fine-tune toàn bộ khối cuối, lr 5e-5, early stopping theo val macro-F1.
@@ -1618,104 +1627,107 @@ Khi demo phải nói rõ ảnh in là đầu vào kiểm thử. Chuẩn bị vid
 
 ## 17. Triển khai
 
-### 17.1. Docker Compose
+> **Từ v1.3:** chạy trực tiếp trên một máy Windows, không Docker (C21). Toàn bộ hệ thống nằm trong thư mục repo `D:\Projects\IOT\IOT-Projects\VuonUom\vuon-uom-iot` (C22). Bản Docker Compose cũ vẫn giữ ở `deployment/docker-compose.yml` để đóng gói sau (§17.9), hiện **không dùng**.
 
-```yaml
-# deployment/docker-compose.yml (đặc tả)
-services:
-  db:
-    image: postgres:16
-    env_file: ../.env
-    volumes: [dbdata:/var/lib/postgresql/data, ../database/init:/docker-entrypoint-initdb.d:ro]
-  mosquitto:
-    image: eclipse-mosquitto:2
-    ports: ["1883:1883"]          # + "8883:8883" nếu bật TLS
-    volumes: [./mosquitto/config:/mosquitto/config, mqdata:/mosquitto/data]
-  ai:
-    build: ../backend/ai-service
-    environment: [MODEL_PATH=/models/current]
-    volumes: [../backend/ai-service/models:/models:ro]
-  backend:
-    build: ../backend/api
-    env_file: ../.env
-    depends_on: [db, mosquitto, ai]
-    volumes: [images:/data/images]
-  web:
-    build: ../frontend            # Nginx: build + proxy /api, /ws; cổng 80 chỉ proxy /device-api/, còn lại chuyển 443
-    ports: ["443:443", "80:80"]
-    depends_on: [backend]
-volumes: {dbdata: {}, mqdata: {}, images: {}}
-```
-
-Chỉ mở ra LAN 3 cổng: 443 (web), 1883 (MQTT thiết bị), 80 (`/device-api/` cho thiết bị; mọi đường dẫn khác chuyển sang 443). CSDL và AI service không mở cổng ra ngoài.
-
-### 17.2. Mosquitto
-
-`mosquitto.conf`:
+### 17.1. Mô hình triển khai
 
 ```
-listener 1883
-allow_anonymous false
-plugin /usr/lib/mosquitto_dynamic_security.so
-plugin_opt_config_file /mosquitto/data/dynamic-security.json
-persistence true
-persistence_location /mosquitto/data/
-log_type error warning notice
+Máy Windows = máy chủ, đồng thời phát WiFi "Mobile Hotspot" (IP luôn là 192.168.137.1)
+ ├─ PostgreSQL 16        127.0.0.1:5433   tools\pgsql   · dữ liệu runtime\pgdata
+ ├─ Mosquitto 2.x        0.0.0.0:1883     tools\mosquitto · dữ liệu runtime\mosquitto
+ ├─ AI service FastAPI   127.0.0.1:8001   backend\ai-service · mô hình runtime\ai\models
+ └─ Backend FastAPI      0.0.0.0:8000     /api, /ws, trang web tĩnh, /device-api
+          ▲ WiFi 2,4 GHz do máy chủ phát (WPA2)
+   Node 1 (ESP32) · Node 2 (ESP32-CAM) · điện thoại/laptop xem dashboard
+ Internet của máy chủ (WiFi khác, hoặc điện thoại cắm USB) ──► Telegram, pool.ntp.org
 ```
 
-Khởi tạo lần đầu:
+Chỉ mở 2 cổng ra mạng hotspot: **1883** (MQTT thiết bị) và **8000** (web, API, upload ảnh). CSDL và AI service chỉ nghe `127.0.0.1`.
 
-- Tạo `dynamic-security.json` bằng `mosquitto_ctrl dynsec init`, với tài khoản `dynsec-admin`.
-- Tạo tài khoản `backend` + role ACL (§8.8).
-- Ghi các bước này thành script `deployment/mosquitto/init.sh`.
+### 17.2. Thư mục (tất cả nằm trong repo)
 
-### 17.3. `.env.example`
+| Thư mục | Nội dung | Commit? |
+|---|---|---|
+| `tools/` | Bản portable: Python (qua `uv`), PostgreSQL, Mosquitto, Node.js, mkcert | Không |
+| `runtime/pgdata/` | Dữ liệu PostgreSQL | Không |
+| `runtime/mosquitto/` | `mosquitto.conf` sinh từ mẫu, `dynamic-security.json`, persistence | Không |
+| `runtime/images/` | Ảnh Node 2 | Không |
+| `runtime/ai/` | Dataset, trọng số mô hình | Không |
+| `runtime/backups/` | Bản sao lưu theo ngày | Không |
+| `runtime/pids/` | PID tiến trình do script ghi | Không |
+| `logs/services/` | Log PostgreSQL, Mosquitto, backend, AI | Không |
+| `logs/firmware/` | Log Serial lưu lại khi thử thiết bị | Không |
+| `logs/tests/` | Log chạy kiểm thử (bản chọn lọc làm bằng chứng chép sang `tests/results/`) | Không |
+| `logs/agent/` | Nhật ký làm việc của trợ lý AI: đã làm gì, lệnh nào, kết quả | Không |
+| `scripts/windows/` | Script PowerShell vận hành (§17.4) | Có |
+| `deployment/mosquitto/` | File mẫu cấu hình broker | Có |
+| `.env` | Giá trị thật | Không |
+| `DINH-HUONG.md` | File định hướng dự án (bản riêng của nhóm) | Không |
+
+Quy tắc: mọi đường dẫn trong script và `.env` là **đường dẫn tương đối tính từ gốc repo**, để chép cả thư mục sang máy khác vẫn chạy.
+
+### 17.3. Công cụ
+
+| Công cụ | Bản | Cách đặt |
+|---|---|---|
+| Python 3.11 | Cài bằng `uv` vào `tools\python` (`UV_PYTHON_INSTALL_DIR`) | Mỗi dịch vụ một `.venv` trong thư mục của nó |
+| PostgreSQL 16 | Gói zip "binaries" cho Windows | Giải nén vào `tools\pgsql`; `initdb -D runtime\pgdata` |
+| Mosquitto 2.x | Bộ cài Windows, chọn thư mục `tools\mosquitto`, **không** cài thành Windows service | Script tự chạy và dừng |
+| Node.js LTS | Gói zip | `tools\node`, chỉ dùng để build frontend |
+| mkcert | exe | `tools\mkcert`, chỉ khi bật HTTPS |
+
+**Kiểm chứng đầu tiên (C18):** thư mục `tools\mosquitto` có `mosquitto_dynamic_security.dll` và `mosquitto_ctrl.exe` chạy được.
+
+### 17.4. Script vận hành (`scripts/windows/`)
+
+| Script | Việc |
+|---|---|
+| `setup.ps1` | Kiểm tra `tools/`, tạo `runtime/` và `logs/`, `initdb`, tạo CSDL + chạy `database/init/*.sql`, tạo `.venv`, cài thư viện |
+| `init-broker.ps1` | Sinh `runtime\mosquitto\mosquitto.conf` từ mẫu, tạo `dynamic-security.json`, tài khoản `dynsec-admin`, `backend` và ACL (§8.8). Thay cho `init-dynsec.sh` |
+| `firewall.ps1` | Chạy với quyền Administrator một lần: mở inbound TCP 1883, 8000 cho mọi loại mạng (hotspot thường bị Windows xếp loại Public) |
+| `start.ps1` | Bật theo thứ tự PostgreSQL → Mosquitto → AI service → backend; ghi PID, log vào `logs\services\` |
+| `stop.ps1` | Dừng theo thứ tự ngược lại |
+| `status.ps1` | Kiểm tra tiến trình, cổng, kết nối CSDL và broker |
+| `backup.ps1` | `pg_dump` + `dynamic-security.json` + ảnh → `runtime\backups\<ngày-giờ>\` |
+| `reset-db.ps1` | Xóa và tạo lại CSDL (lưu ý quy tắc phiên bản cấu hình §9.3) |
+
+### 17.5. Mosquitto trên Windows
+
+- Mẫu cấu hình: `deployment/mosquitto/mosquitto.windows.conf`. Script điền đường dẫn tuyệt đối của máy và ghi ra `runtime\mosquitto\mosquitto.conf`.
+- Nội dung: `listener 1883`, `allow_anonymous false`, plugin `mosquitto_dynamic_security.dll`, `persistence` vào `runtime\mosquitto`, `log_dest file logs\services\mosquitto.log`.
+- **Lỗi lưu file của dynsec trên Windows (phát hiện 06/11, Mosquitto 2.0.18):** plugin ghi cấu hình ra `dynamic-security.json.new` rồi đổi tên đè lên file cũ; Windows không cho đổi tên đè nên log báo `Error updating dynsec config file: File exists`, thay đổi chỉ nằm trong bộ nhớ và **mất khi khởi động lại broker**. Cách xử lý: sau mỗi lệnh dynsec, trước khi bật và sau khi tắt broker, chép `.new` về đúng tên (`Sync-DynsecFile` trong `scripts/windows/common.ps1`). Backend khi cấp phát/khóa/thu hồi thiết bị **phải làm tương tự**.
+- **Dự phòng nếu dynsec không dùng được trên Windows (C18):** backend sinh `password_file` + `acl_file`. Windows không có `SIGHUP`, nên muốn nạp lại thì khởi động lại broker; thiết bị tự kết nối lại theo backoff trong vài giây.
+
+### 17.6. `.env.example`
+
+Giá trị cho chạy local (xem file `.env.example` ở gốc repo):
 
 ```
-# Database
-POSTGRES_DB=nursery
-POSTGRES_USER=nursery_app
-POSTGRES_PASSWORD=change-me
-DB_URL=postgresql://db:5432/nursery
-# Auth
-JWT_SECRET=change-me-32-bytes-min
-JWT_ACCESS_TTL_MIN=15
-JWT_REFRESH_TTL_DAYS=7
-# MQTT
-MQTT_HOST=mosquitto
-MQTT_PORT=1883
-MQTT_BACKEND_USER=backend
-MQTT_BACKEND_PASSWORD=change-me
-MQTT_DYNSEC_USER=dynsec-admin
-MQTT_DYNSEC_PASSWORD=change-me
-MQTT_PUBLIC_HOST=192.168.1.10      # địa chỉ thiết bị dùng để kết nối
-# Telegram
-TELEGRAM_BOT_TOKEN=change-me
-# AI
-AI_URL=http://ai:8000
-AI_CONF_UNKNOWN=0.6
-AI_CONF_ALERT=0.8
-# Storage
-IMAGE_DIR=/data/images
-RETENTION_TELEMETRY_DAYS=30
-RETENTION_IMAGES_DAYS=14
-# Seed (chỉ dùng lúc khởi tạo)
-SEED_ADMIN_PASSWORD=change-me
-SEED_OPERATOR_PASSWORD=change-me
-SEED_VIEWER_PASSWORD=change-me
-# Web
-PUBLIC_ORIGIN=https://192.168.1.10
+DB_HOST=127.0.0.1                 # CSDL chỉ nghe máy chủ
+MQTT_HOST=127.0.0.1               # backend kết nối broker trên cùng máy
+MQTT_PUBLIC_HOST=192.168.137.1    # thiết bị kết nối địa chỉ này
+BACKEND_PORT=8000
+AI_URL=http://127.0.0.1:8001
+IMAGE_DIR=runtime/images
+PUBLIC_ORIGIN=http://192.168.137.1:8000
 ```
 
-### 17.4. Mạng khi demo
+### 17.7. Mạng khi demo (C17)
 
-- Router riêng của nhóm. Máy server giữ IP `192.168.1.10` bằng DHCP reservation (C17).
-- `MQTT_PUBLIC_HOST`, `MQTT_HOST` trong `secrets.h` và `PUBLIC_ORIGIN` phải trùng nhau.
-- Máy server luôn chạy `chrony` làm máy chủ NTP cho thiết bị (C11). Nếu LAN không có Internet: Telegram demo bằng điện thoại phát 4G cho máy server.
+1. Bật **Mobile Hotspot** của Windows (Settings → Network & Internet → Mobile hotspot). Chọn băng tần **2,4 GHz**, đặt tên WiFi và mật khẩu cố định. Máy chủ luôn có IP `192.168.137.1` trên mạng này.
+2. Internet cho máy chủ (để gửi Telegram, đồng bộ NTP): WiFi khác, cáp mạng, hoặc điện thoại cắm USB chia sẻ mạng. Hotspot chia sẻ lại Internet đó cho các node.
+3. Tắt tùy chọn tiết kiệm điện của hotspot (tự tắt khi không có thiết bị nào kết nối). Đặt máy không ngủ khi cắm sạc.
+4. Chạy `firewall.ps1` một lần.
+5. **Kiểm tra sớm:** card WiFi của máy có phát hotspot được khi chính nó đang nối WiFi khác không. Không được thì dùng cáp mạng hoặc điện thoại cắm USB làm đường Internet.
+6. **Dự phòng:** điện thoại phát WiFi, máy chủ và hai node cùng vào. Khi đó IP máy chủ thay đổi: sửa `MQTT_HOST`, `UPLOAD_URL` trong `secrets.h` rồi nạp lại firmware, sửa `MQTT_PUBLIC_HOST`, `PUBLIC_ORIGIN` trong `.env`.
 
-### 17.5. Sao lưu
+### 17.8. Sao lưu
 
-`pg_dump` trước mỗi buổi demo. Sao lưu `dynamic-security.json` và thư mục ảnh.
+Chạy `backup.ps1` trước mỗi buổi diễn tập và trước buổi demo. Bản sao lưu nằm trong `runtime\backups\`.
+
+### 17.9. Docker (để sau)
+
+`deployment/docker-compose.yml` và `deployment/mosquitto/init-dynsec.sh` giữ nguyên, chưa dùng. Khi đóng gói Docker (sau demo, nếu cần): viết `Dockerfile` cho `backend/api`, `backend/ai-service`, `frontend`; đổi `DB_HOST`, `MQTT_HOST`, `AI_URL` sang tên dịch vụ; ánh xạ `runtime/` thành volume.
 
 ---
 
@@ -1739,10 +1751,16 @@ frontend/
 database/
   init/                   # schema.sql, seed.sql
   migrations/
+scripts/
+  windows/                # setup, init-broker, firewall, start, stop, status, backup, reset-db (.ps1)
 deployment/
-  docker-compose.yml
-  mosquitto/              # mosquitto.conf, init.sh
-  nginx/
+  mosquitto/              # mosquitto.windows.conf (mẫu), mosquitto.conf + init-dynsec.sh (bản Docker, để sau)
+  docker-compose.yml      # để sau (§17.9)
+  nginx/                  # để sau
+tools/                    # công cụ portable — KHÔNG commit
+runtime/                  # dữ liệu chạy — KHÔNG commit
+logs/                     # log dịch vụ, firmware, kiểm thử, nhật ký trợ lý AI — KHÔNG commit
+DINH-HUONG.md             # định hướng dự án — KHÔNG commit
 hardware/
   wiring.md, wiring.png   # sơ đồ nối dây
   bom.md                  # danh sách linh kiện, chi phí
@@ -1823,7 +1841,7 @@ Lắp và test từng linh kiện theo `firmware/test-hardware`, ghi kết quả
 
 ### 20.1. Chuẩn bị
 
-- Server chạy trước, dữ liệu seed sạch.
+- Bật Mobile Hotspot; chạy `start.ps1` rồi `status.ps1`, mọi mục đều OK; dữ liệu seed sạch (khôi phục từ bản sao lưu nếu cần).
 - 3 trình duyệt hoặc tab ẩn danh, mỗi tab một vai trò.
 - Telegram mở trên điện thoại.
 - Bể đầy nước; có lá bệnh hoặc ảnh in.
@@ -1852,29 +1870,34 @@ Lắp và test từng linh kiện theo `firmware/test-hardware`, ghi kết quả
 
 ### 21.1. Phân công
 
+> Từ 05/11 nhóm làm việc với 2–3 người. Bảng dưới là phân công ban đầu; phân vai thực tế theo `DINH-HUONG.md` (C23).
+
 | Thành viên | Mảng | Sản phẩm chính |
 |---|---|---|
 | Hà Mạnh Quân | Phần cứng, firmware | 2 node, đấu nối, hiệu chuẩn, logic edge, đệm offline, keypad/OLED |
 | Lê Trung Kiên | Backend (FastAPI), CSDL | API, ingest MQTT, vòng đời, lệnh, cấu hình, rule engine, Telegram |
 | Nguyễn Văn Đức Anh | Frontend, kiểm thử | Web, WebSocket client, kịch bản và số liệu kiểm thử, thiết bị mô phỏng |
-| Cao Công Hoè | Bảo mật, DevOps, AI | Mô-đun auth/JWT, `canView`/`canControl`, lọc WebSocket, rate limit (viết trong backend, Kiên review — C16); dynsec/ACL; Docker Compose, Nginx/TLS, chrony; AI service, huấn luyện |
+| Cao Công Hoè | Bảo mật, DevOps, AI | Mô-đun auth/JWT, `canView`/`canControl`, lọc WebSocket, rate limit (viết trong backend, Kiên review — C16); dynsec/ACL; triển khai Windows (C21); AI service, huấn luyện |
 
 ### 21.2. Lộ trình
 
-| Giai đoạn | Thời gian | Đầu ra |
+Lộ trình cũ (G1–G5) được thay từ 05/11 cho mốc demo khoảng **18/11**, chạy trên máy Windows (C23).
+
+| Giai đoạn | Ngày | Đầu ra |
 |---|---|---|
-| G0 — Chốt thiết kế | 31/10 – 04/11 | Đã chốt §22 (trừ C8); repo, Compose khung, schema, slide. Đã thuyết trình 04/11 |
-| G1 — Nền tảng | 04/11 – 10/11 | Lắp và test Node 1; telemetry MQTT; auth, users, devices, ingest; web đăng nhập + dashboard; Node 2 chụp + upload; bắt đầu thu ảnh; ST3 (07/11) |
-| G2 — Nghiệp vụ | 11/11 – 17/11 | Lệnh/ack, config retain, logic edge, đệm offline; vòng đời + dynsec; cảnh báo + Telegram; huấn luyện và tích hợp AI; chốt C8 |
-| G3 — Kiểm thử | 18/11 – 22/11 | FT, NFR, ST; số liệu, ảnh, video |
-| G4 — Nộp | 22/11 – 24/11 | Báo cáo, README, tag `v1.0.0` |
-| G5 — Demo | 25/11 – 02/12 | Diễn tập, video dự phòng |
+| N0 — Nền tảng Windows | 05–06/11 | Công cụ trong `tools/`, script `setup/start/stop/status`, CSDL + seed, broker + kiểm chứng dynsec (C18), hotspot + tường lửa, thiết bị mô phỏng gửi telemetry |
+| N1 — Bộ xương xuyên suốt | 07–09/11 | Backend: auth, devices, ingest, WebSocket; web: đăng nhập + dashboard realtime; Node 1 lắp xong, qua `test-hardware`, nối broker thật; tải dataset, huấn luyện giai đoạn 1 trên Colab |
+| N2 — Nghiệp vụ | 10–12/11 | Lệnh + ack, cấu hình, cấp phát/khóa/thu hồi qua dynsec, offline, cảnh báo + Telegram, audit; firmware Node 2 chụp + upload |
+| N3 — Ảnh và AI | 13–14/11 | Nhận ảnh, hàng đợi chẩn đoán, AI service suy luận, luật AI_LEAF, màn hình ảnh |
+| N4 — Diễn tập | 15–17/11 | Chạy đủ 10 bước + AI nhiều lần, sửa lỗi, quay video dự phòng, sao lưu |
+| Demo | khoảng 18/11 | |
+| N5 — Hoàn thiện | 19–24/11 | Đo NFR, đủ ST1–ST6, báo cáo, tag `v1.0.0`; tùy chọn HTTPS, Docker |
 
 Mốc của học phần:
 
 - Thuyết trình: **đã thực hiện 04/11**.
+- Demo trên máy này: **khoảng 18/11** (C23).
 - Nộp báo cáo và mã nguồn: **24/11**.
-- Demo và vấn đáp: 25/11 hoặc 02/12.
 
 ### 21.3. Rủi ro
 
@@ -1885,15 +1908,17 @@ Mốc của học phần:
 | AI kém trên ảnh thật | Fine-tune bằng ảnh tự chụp; ngưỡng "Không xác định"; báo cáo trung thực |
 | Bơm làm reset ESP32 | Tụ, diode, GND chung, nguồn tải qua domino |
 | Cảm biến đất điện trở bị ăn mòn | Chỉ cấp nguồn khi đo (GPIO32); bọc silicon |
-| WiFi phòng demo kém | Router riêng; video dự phòng |
-| dynsec không ngắt kết nối ngay | Kiểm chứng sớm (ST3) + phương án §8.8 |
+| WiFi phòng demo kém | Máy chủ tự phát hotspot (C17); video dự phòng |
+| Công cụ chạy khác trên Windows (dynsec, đường dẫn, tường lửa) | Kiểm chứng trong N0 trước khi viết backend; mọi đường dẫn tương đối theo gốc repo |
+| Máy chủ ngủ hoặc hotspot tự tắt giữa demo | Tắt chế độ ngủ khi cắm sạc, tắt tiết kiệm điện của hotspot (§17.7) |
+| dynsec không ngắt kết nối ngay, hoặc không chạy trên Windows | Kiểm chứng trong N0 (ST3) + phương án §17.5 |
 | Lộ bí mật | `.gitignore` từ commit đầu; secret scanning |
 
 ---
 
 ## 22. Các quyết định đã chốt
 
-Chốt ngày 04/11/2026. Còn mở: **C8**. C18 quyết định ngày 07/11 theo kết quả ST3.
+Chốt ngày 04/11/2026, sửa ngày 05/11/2026 (đánh dấu **sửa 05/11**). Còn mở: **C8**.
 
 | # | Vấn đề | Đã chốt | Mục liên quan |
 |---|---|---|---|
@@ -1901,22 +1926,26 @@ Chốt ngày 04/11/2026. Còn mở: **C8**. C18 quyết định ngày 07/11 theo
 | C2 | Chip OLED | SH1106, thư viện U8g2 | §5.1, §6.9 |
 | C3 | Quạt và động cơ mini | Chỉ **1 quạt**, trên relay kênh 2 (GPIO27). Quạt là quạt 5 V có sẵn hoặc động cơ mini gắn cánh. Relay kênh 3 để trống | D10, §5.1 |
 | C4 | DHT11 trên Node 2 | Không gắn. Node 2 chỉ chụp ảnh | §5.4, §7.1 |
-| C5 | MQTT/TLS | Kênh thiết bị không mã hóa trên router riêng, ghi hạn chế. HTTPS cho web bắt buộc. Thử 8883 khi đủ 10 bước demo | §14.2 |
+| C5 | MQTT/TLS | **Sửa 05/11:** kênh thiết bị không mã hóa trong hotspot WPA2 riêng, ghi hạn chế. Demo chạy HTTP; HTTPS cho web (uvicorn + mkcert, cổng 8443) làm ở N5 nếu kịp | §14.2 |
 | C6 | 403 hay 404 | Không được gán → 404; được gán VIEW mà thao tác → 403 | §10.1, ST1 |
 | C7 | Đăng ký tự do | Không làm. Chỉ ADMIN tạo tài khoản | §10.2 |
 | C8 | Ánh xạ nhãn AI | **Chốt sau**, khi đã xem ảnh thật. Tạm dùng bảng §15.2 cho giai đoạn 1 | §15.2 |
 | C9 | Ngưỡng tưới | Dùng mặc định §6.5, chỉnh sau 2–3 ngày quan sát | §6.5 |
 | C10 | Loại cảm biến đất | Loại điện trở → cấp nguồn qua GPIO32, chỉ bật khi đo | §5.2 |
-| C11 | NTP | `chrony` trên máy server là máy chủ chính, `pool.ntp.org` dự phòng | §6.7, §17.4 |
+| C11 | NTP | **Sửa 05/11:** `pool.ntp.org` qua Internet chia sẻ vào hotspot. Không chạy chrony | §6.7, §17.7 |
 | C12 | TimescaleDB | Không dùng | §1.3, §11 |
 | C13 | Ngày thuyết trình | Đã thuyết trình 04/11 | §21.2 |
-| C14 | Cập nhật firmware | **Tạm chưa làm OTA.** Firmware nạp bằng cáp; OTA có ký số là hướng phát triển. Khi làm OTA thì phải chuyển bí mật thiết bị ra khỏi firmware (vào NVS) | §2.4 |
-| C15 | Kênh HTTP của thiết bị | Cổng 80 chỉ proxy `/device-api/`, còn lại chuyển HTTPS | §8.9, §17.1 |
+| C14 | Cập nhật firmware | **Tạm chưa làm OTA** (giữ nguyên 05/11; phần OTA trong bộ slide là hướng phát triển). Firmware nạp bằng cáp; OTA có ký số là hướng phát triển. Khi làm OTA thì phải chuyển bí mật thiết bị ra khỏi firmware (vào NVS) | §2.4 |
+| C15 | Kênh HTTP của thiết bị | **Sửa 05/11:** backend phục vụ thẳng `/device-api/` ở cổng 8000, không có proxy | §8.9, §17.1 |
 | C16 | Người viết auth | Hoè viết auth/RBAC/lọc WS trong backend, Kiên review | §21.1 |
-| C17 | Mạng demo | Router riêng, server `192.168.1.10` (DHCP reservation) | §17.4 |
-| C18 | dynsec hay passwd/acl | Theo ST3 ngày 07/11: không ngắt được phiên đang mở thì đổi sang passwd/acl + SIGHUP | §8.8 |
+| C17 | Mạng demo | **Sửa 05/11:** Mobile Hotspot của chính máy chủ Windows, máy chủ cố định `192.168.137.1` | §17.7 |
+| C18 | dynsec hay passwd/acl | **Chốt 06/11: giữ Dynamic Security.** Kiểm chứng trên Windows: `disableClient` ngắt ngay phiên đang mở, kết nối lại bị từ chối (`logs/tests/st3-dynsec-windows.txt`). Phải đồng bộ file `.new` sau mỗi lệnh (§17.5) | §8.8, §17.5 |
 | C19 | Số use case | 27 (UC00–UC26), khớp slide 4. Sơ đồ trong báo cáo nối thêm Node 2 với UC18, UC19, UC20 | §3.2 |
 | C20 | Phân công | Đã điền tên | §21.1 |
+| C21 | Cách triển khai | **Mới 05/11:** chạy trực tiếp trên một máy Windows bằng script PowerShell, không Docker. Docker Compose để sau demo | §17 |
+| C22 | Một thư mục | **Mới 05/11:** toàn bộ công cụ, dữ liệu, cấu hình, log (kể cả nhật ký trợ lý AI) nằm trong thư mục repo; phần không commit nằm trong `.gitignore`; đường dẫn tương đối theo gốc repo | §17.2 |
+| C24 | Mô hình AI | **Mới 06/11:** dùng mô hình tiền huấn luyện công khai trên PlantVillage, gộp nhãn về 3 lớp; không tự huấn luyện trước demo. Fine-tune 3 giai đoạn là hướng phát triển | §15.5 |
+| C23 | Lịch và phạm vi | **Mới 05/11:** demo khoảng 18/11 trên máy này, 2–3 người. Ưu tiên đủ 10 bước demo + AI; phần còn lại làm sau demo | §21.2 |
 
 ---
 
@@ -1949,7 +1978,7 @@ Chốt ngày 04/11/2026. Còn mở: **C8**. C18 quyết định ngày 07/11 theo
 | Backend quản lý, không chỉ dashboard | §9–§13 |
 | Quản lý người dùng và thiết bị | §10.3, §10.5, §12.1 |
 | Xác thực, phân quyền | §14 |
-| Mã nguồn chạy được | Docker Compose + README |
+| Mã nguồn chạy được | Script `scripts/windows/` + README (Docker để sau) |
 | Luồng đầu cuối | FT3–FT5, demo bước 3–5 |
 | Mọi thành viên vấn đáp được | Phân công theo lớp §21.1 |
 

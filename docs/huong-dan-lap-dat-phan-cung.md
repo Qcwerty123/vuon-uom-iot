@@ -773,7 +773,7 @@ Module có jumper chọn mức kích cho từng kênh. Với ESP32 (3,3 V), đ�
 - Ở chế độ **L**, chân IN được kéo lên 5 V trên module. Mức HIGH 3,3 V của ESP32 có thể không tắt hẳn opto, nên relay dễ bị dính hoặc LED sáng mờ.
 - Ở chế độ **H**, mức 3,3 V đủ để kích. Khi ESP32 khởi động (chân ở mức thấp hoặc thả nổi), relay **tắt**. Đó là trạng thái an toàn.
 
-Ghi lại lựa chọn vào nhật ký. Firmware đặt `RELAY_ACTIVE_LOW = false` cho chế độ H.
+Ghi lại lựa chọn vào nhật ký. Firmware Node 1 đặt `#define RELAY_ACTIVE_HIGH 1` trong `app.h` cho chế độ H (đặt `0` nếu dùng chế độ L).
 
 Nếu module có thêm jumper **JD-VCC / VCC**: giữ nguyên jumper (cuộn relay và mạch opto dùng chung 5 V của domino).
 
