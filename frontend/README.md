@@ -11,6 +11,11 @@ cd frontend
 ..\tools\node\npm.cmd run build        # ra frontend\dist; backend tự phục vụ ở http://192.168.137.1:8000 (khởi động lại backend sau lần build đầu)
 ```
 
+- **Cài dependency:** chỉ một lệnh `npm install` (gói lấy theo `package.json` + `package-lock.json`, ~100 gói, ~15 s), làm lần đầu
+  hoặc khi `package.json` đổi. **Cần có mạng** — máy chủ demo không có internet thì cài + build trước, hoặc build ở máy khác rồi chép `frontend/dist` sang.
+  Máy cá nhân có Node sẵn thì gõ `npm install` / `npm run ...` thay cho `..\tools\node\npm.cmd`.
+- Lúc demo chỉ cần thư mục `dist/`; backend Python không cần gói nào của frontend.
+- Bỏ qua cảnh báo `recharts deprecated` và `vulnerabilities` khi cài (thuộc dev server). **Không chạy `npm audit fix --force`** — lệnh này nâng Vite lên bản mới, hỏng build.
 - **Làm trên máy khác** (đã vào hotspot của máy chủ): `$env:BACKEND_URL = "http://192.168.137.1:8000"; ..\tools\node\npm.cmd run dev`.
 - **Không có backend:** `..\tools\node\npm.cmd run dev:mock` chạy toàn bộ API + WebSocket bằng dữ liệu giả trong trình duyệt
   (đăng nhập `admin` / `operator` / `viewer`, mật khẩu bất kỳ; gõ `sai` để thử lỗi). Trong console có `__mock.dropWs()`,
