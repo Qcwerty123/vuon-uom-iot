@@ -4,7 +4,7 @@
 
 #define WIFI_SSID      "ten-wifi-2.4GHz"
 #define WIFI_PASS      "mat-khau-wifi"
-#define MQTT_HOST      "192.168.137.1"  // IP máy chủ trên Mobile Hotspot (C17) = MQTT_PUBLIC_HOST trong .env
+#define MQTT_HOST      "192.168.137.1"  // = MQTT_PUBLIC_HOST trong .env (Mobile Hotspot của máy chủ, C17)
 #define MQTT_PORT      1883
 #define GARDEN_CODE    "g01"
 #define DEVICE_CODE    "ctl-0001"
