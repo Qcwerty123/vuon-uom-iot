@@ -3,6 +3,7 @@
  *
  * Đặc tả: docs/dac-ta-he-thong.md §6 (firmware), §8 (MQTT).
  * Board: NodeMCU-32S · Partition: Default · Serial Monitor 115200, New Line.
+ * v1.1.0: đèn chiếu sáng bổ sung trên relay kênh 3 (§6.11), lệch pha 400 ms khi bật relay, khóa nhiệt.
  * Thư viện: PubSubClient, ArduinoJson 7, DHT sensor library (+ Adafruit Unified Sensor),
  *           BH1750 (Christopher Laws), Keypad, U8g2 — phiên bản theo firmware/LIBRARIES.md.
  *
@@ -12,7 +13,7 @@
  *   app.h            hằng số, gán chân, kiểu dữ liệu chung
  *   config_store.*   cấu hình + seq lưu NVS
  *   sensors.*        đọc, lọc, phát hiện lỗi, hợp nhất 2 cảm biến đất
- *   control.*        tưới, quạt, AUTO/MANUAL/LOCAL, khóa an toàn
+ *   control.*        tưới, quạt, đèn, AUTO/MANUAL/LOCAL, khóa an toàn, lệch pha relay
  *   net.*            WiFi, NTP, MQTT
  *   protocol.*       telemetry/status/event/ack, xử lý command/config
  *   buffer.*         hàng đợi 200 bản ghi khi mất mạng
@@ -33,11 +34,12 @@ static char serialLine[32];
 static uint8_t serialLen = 0;
 
 static void printHelp() {
-  Serial.println("Lenh Serial: s = cam bien | c = cau hinh | n = mang | h = tro giup | factory = xoa cau hinh");
+  Serial.println("Lenh Serial: s = cam bien | d = den/relay | c = cau hinh | n = mang | h = tro giup | factory = xoa cau hinh");
 }
 
 static void runSerialCommand(const char* cmd) {
   if (strcmp(cmd, "s") == 0) sensorsPrint();
+  else if (strcmp(cmd, "d") == 0) controlPrint();
   else if (strcmp(cmd, "c") == 0) configPrint();
   else if (strcmp(cmd, "n") == 0) netPrint();
   else if (strcmp(cmd, "h") == 0) printHelp();
@@ -93,8 +95,8 @@ void loop() {
   uint32_t now = millis();
   if ((int32_t)(now - nextLog) >= 0) {
     nextLog = now + LOG_PERIOD_MS;
-    Serial.printf("[%lus] %s bom=%d quat=%d dem=%u | ", (unsigned long)(now / 1000), modeName(),
-                  pumpIsOn(), fanIsOn(), bufCount());
+    Serial.printf("[%lus] %s bom=%d quat=%d den=%d dem=%u | ", (unsigned long)(now / 1000), modeName(),
+                  pumpIsOn(), fanIsOn(), lampIsOn(), bufCount());
     sensorsPrint();
   }
 }

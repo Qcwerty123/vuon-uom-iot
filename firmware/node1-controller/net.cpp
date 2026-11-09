@@ -7,7 +7,7 @@
 #include "protocol.h"
 
 #ifndef NTP_SERVER
-#define NTP_SERVER MQTT_HOST
+#define NTP_SERVER "pool.ntp.org"
 #endif
 
 static WiFiClient wifiClient;
@@ -39,7 +39,7 @@ static void startWifi() {
 }
 
 static void startNtp() {
-  configTime(0, 0, NTP_SERVER, "pool.ntp.org");  // UTC; máy server chạy chrony là nguồn chính (C11)
+  configTime(0, 0, NTP_SERVER, "time.google.com");  // UTC, qua Internet chia sẻ vào hotspot (C11)
   ntpNext = millis() + NTP_RESYNC_MS;
 }
 

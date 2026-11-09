@@ -6,7 +6,7 @@ Config cfg;
 static Preferences prefs;
 static uint32_t seqT = 0, seqE = 0;
 static const uint32_t SEQ_SAVE_EVERY = 50;
-static const uint32_t CFG_MAGIC = 0x4E310001;  // đổi khi đổi cấu trúc Config
+static const uint32_t CFG_MAGIC = 0x4E310002;  // đổi khi đổi cấu trúc Config (v1.1.0: thêm lamp_*)
 
 struct StoredConfig {
   uint32_t magic;
@@ -31,6 +31,15 @@ static Config defaults() {
   c.s2 = {3210, 1290};
   c.tankEmptyCm = 25.0;
   c.tankFullCm = 5.0;
+  c.lampStartHour = 6;
+  c.lampEndHour = 20;
+  c.lampLuxLow = 800;
+  c.lampHyst = 700;       // tắt khi lux ≥ 1500
+  c.lampSelfLux = 300;    // thay bằng số đo thật qua config
+  c.lampHoldS = 10;
+  c.lampMinOnS = 30;      // chạy thật nên 300–600
+  c.lampMinOffS = 30;
+  c.lampOverrideMin = 60;
   return c;
 }
 
@@ -71,6 +80,10 @@ void configPrint() {
                 cfg.tempHigh, cfg.tempHyst, cfg.humHigh, cfg.humHyst, cfg.telemetryIntervalS, cfg.manualIgnoresCooldown);
   Serial.printf("soil_cal s1=%u/%u s2=%u/%u tank_cal empty=%.1f full=%.1f\n",
                 cfg.s1.dry, cfg.s1.wet, cfg.s2.dry, cfg.s2.wet, cfg.tankEmptyCm, cfg.tankFullCm);
+  Serial.printf("lamp %02u-%02uh lux_low=%u hyst=%u (tat >= %u) self=%u hold=%us min_on=%us min_off=%us override=%umin\n",
+                cfg.lampStartHour, cfg.lampEndHour, cfg.lampLuxLow, cfg.lampHyst,
+                cfg.lampLuxLow + cfg.lampHyst, cfg.lampSelfLux, cfg.lampHoldS,
+                cfg.lampMinOnS, cfg.lampMinOffS, cfg.lampOverrideMin);
 }
 
 // ---------- kiểm tra cấu hình nhận qua MQTT ----------
@@ -137,7 +150,23 @@ const char* configParse(JsonObjectConst p, Config& out) {
     if (!takeFloat(o, "empty_cm", 2, 400, out.tankEmptyCm, err)) return "tank_cal.empty_cm";
     if (!takeFloat(o, "full_cm", 2, 400, out.tankFullCm, err)) return "tank_cal.full_cm";
   }
+  // Chiếu sáng bổ sung (§6.11)
+  uint16_t sh = out.lampStartHour, eh = out.lampEndHour;
+  if (!takeU16(p, "lamp_start_hour", 0, 23, sh, err)) return err;
+  if (!takeU16(p, "lamp_end_hour", 1, 24, eh, err)) return err;
+  out.lampStartHour = uint8_t(sh);
+  out.lampEndHour = uint8_t(eh);
+  if (!takeU16(p, "lamp_lux_low", 0, 65535, out.lampLuxLow, err)) return err;
+  if (!takeU16(p, "lamp_hyst", 1, 65535, out.lampHyst, err)) return err;
+  if (!takeU16(p, "lamp_self_lux", 0, 5000, out.lampSelfLux, err)) return err;
+  if (!takeU16(p, "lamp_hold_s", 2, 600, out.lampHoldS, err)) return err;
+  if (!takeU16(p, "lamp_min_on_s", 10, 3600, out.lampMinOnS, err)) return err;
+  if (!takeU16(p, "lamp_min_off_s", 10, 3600, out.lampMinOffS, err)) return err;
+  if (!takeU16(p, "lamp_override_min", 1, 240, out.lampOverrideMin, err)) return err;
   // Ràng buộc chéo giữa các khóa
+  if (out.lampEndHour <= out.lampStartHour) return "lamp_end_hour";
+  // Phần sáng do chính đèn tạo ra không được đủ để vượt ngưỡng tắt → đèn không tự bật/tắt liên tục
+  if (uint32_t(out.lampHyst) <= uint32_t(out.lampSelfLux) + 200) return "lamp_hyst";
   if (out.soilLow >= out.soilHigh) return "soil_low";
   if (out.tankEmptyCm - out.tankFullCm < 2) return "tank_cal";
   return nullptr;

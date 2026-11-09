@@ -1,8 +1,10 @@
 # Đặc tả hệ thống — Hệ thống chăm sóc vườn ươm thông minh
 
-> Đồ án kết thúc học phần **IoT và ứng dụng** · Tài liệu đặc tả v1.3 · 05/11/2026 (đã chốt các điểm ở §22, còn mở C8)
+> Đồ án kết thúc học phần **IoT và ứng dụng** · Tài liệu đặc tả v1.4 · 07/11/2026 (đã chốt các điểm ở §22, còn mở C8)
 >
 > **Thay đổi v1.3 (05/11):** chạy trực tiếp trên một máy Windows, không Docker (C21); mọi thứ gói trong thư mục repo (C22); mạng demo là Mobile Hotspot của chính máy chủ, IP cố định `192.168.137.1` (C17); bỏ Nginx và chrony; demo khoảng 18/11 với 2–3 người (C23); thêm 2 quy tắc chống lỗi khi reset CSDL hoặc xóa flash (§8.10, §9.3). Các mục đổi: §1, §6.7, §6.10, §8.9, §8.10, §9.3, §14.2, §17, §18.1, §21, §22, §23.2.
+>
+> **Thay đổi v1.4 (07/11):** thêm chiếu sáng bổ sung bằng đèn LED 5 V trên relay kênh 3, dùng chung củ sạc 5V/3A (§6.11, C25): khung giờ + bù theo lux có trễ, debounce, thời gian giữ, BH1750 lỗi thì bật theo lịch, khóa nhiệt; mọi lần bật relay lệch nhau 400 ms. Các mục đổi: §1.2, §3.4, §5, §6.6, §6.8, §6.11, §8.3, §8.5, §8.6, §8.7, §11.2, §16, §19.1, §21.2, §22.
 >
 > Tài liệu này gom toàn bộ phân tích và các quyết định đã chốt, rồi chi tiết hóa tới mức có thể bắt tay vào code: chân GPIO, firmware, MQTT, REST API, schema CSDL, máy trạng thái, bảo mật, AI, triển khai, kiểm thử và demo.
 >
@@ -68,7 +70,7 @@ Dữ liệu và lệnh đi qua broker MQTT. Ảnh gửi thẳng tới backend qu
 | D7 | AI chỉ cảnh báo, không tự điều khiển. Người vận hành xác nhận kết quả | Mô hình có thể sai trên ảnh thật |
 | D8 | Demo AI phải ra ít nhất 2 kết quả khác nhau: cây khỏe + lá bệnh thật hoặc ảnh in lá bệnh | Chỉ có "khỏe" thì không chứng minh được mô hình |
 | D9 | 2 cảm biến độ ẩm đất (không phải 3). Hợp nhất 2 giá trị theo quy tắc §6.4 | Đúng số linh kiện đang có |
-| D10 | Không có cơ cấu chiếu sáng (chưa có đèn LED). Chỉ có **1 quạt**, trên relay kênh 2. Relay kênh 3 để dự phòng | Danh sách linh kiện không có đèn. Quạt là quạt 5 V có sẵn hoặc động cơ mini gắn cánh (C3) |
+| D10 | Chiếu sáng bổ sung bằng đèn LED 5 V trên relay kênh 3, điều khiển theo khung giờ + lux (§6.11). Chỉ có **1 quạt**, trên relay kênh 2 | Cây giống cần đủ giờ chiếu sáng và đêm tối. Quạt là quạt 5 V có sẵn hoặc động cơ mini gắn cánh (C3, C25) |
 | D11 | Vòng đời 8 trạng thái: Registered, Provisioned, Active, Offline, Fault, Maintenance, Suspended, Decommissioned | Bao phủ 10 bước vòng đời trong [ĐỀ 4.4b] |
 | D12 | Khóa hoặc thu hồi thiết bị là chặn ở tầng broker (vô hiệu tài khoản MQTT), không chỉ bỏ qua dữ liệu ở backend | Bước 10 của kịch bản demo |
 | D13 | QoS 1 cho lệnh và cấu hình. Chống trùng ở tầng ứng dụng bằng `seq` và `cmd_id` | PubSubClient chỉ publish được QoS 0 |
@@ -261,7 +263,7 @@ Use case lõi, không có tác nhân gọi trực tiếp:
 | FR-D2 | Mỗi node có `device_code` và secret riêng | 4.2, 4.5 |
 | FR-D3 | Telemetry mỗi 10 giây, có `ts`, `seq`, đơn vị | 4.2, 4.3 |
 | FR-D4 | Nhận lệnh và cấu hình. Ack mọi lệnh và mọi lần áp cấu hình | 4.2, 4.4e |
-| FR-D5 | Node 1 điều khiển bơm, quạt. Node 2 điều khiển đèn flash | 4.2 |
+| FR-D5 | Node 1 điều khiển bơm, quạt, đèn chiếu sáng. Node 2 điều khiển đèn flash | 4.2 |
 | FR-D6 | Heartbeat 30 giây + LWT. Báo `fw_version`, `hw_version` | 4.2, 4.4b |
 | FR-D7 | Tự kết nối lại có backoff. Đệm ≥ 100 bản ghi, gửi bù | 4.2 |
 | FR-D8 | Tưới và thông gió tự động tại thiết bị, có khóa an toàn | — |
@@ -390,6 +392,7 @@ Xem D3, D4, D5, D12, D13 ở §1.2. Bổ sung:
 | 16 | Điện trở 1 kΩ, 2 kΩ | 50+50 | Cầu chia áp ECHO |
 | 17 | Domino 12 cực, breadboard 400 lỗ, dây, header | — | Đấu nối |
 | 18 | Củ sạc 5V/3A, 5V/2A | 2 | Nguồn |
+| 19 | Đèn LED 5 V ánh trắng ≤ 5 W (**cần mua**) | 1 | Chiếu sáng bổ sung, relay kênh 3 (§6.11) |
 
 ### 5.2. Gán chân Node 1 (đề xuất)
 
@@ -405,7 +408,7 @@ Xem D3, D4, D5, D12, D13 ở §1.2. Bổ sung:
 | HC-SR04 ECHO | **GPIO18** qua cầu chia 1 kΩ/2 kΩ | 5 V × 2/3 ≈ 3,33 V |
 | Relay IN1 — bơm | **GPIO26** | |
 | Relay IN2 — quạt | **GPIO27** | |
-| Relay IN3 — dự phòng | GPIO25 | Để trống, dành cho đèn nếu bổ sung |
+| Relay IN3 — đèn | **GPIO25** | Đèn LED 5 V (§6.11) |
 | Relay IN4 | — | Bỏ trống |
 | Keypad hàng R1–R4 | **GPIO13, 14, 16, 17** | Chân ra |
 | Keypad cột C1–C3 | **GPIO19, 23, 33** | Chân vào, pull-up nội |
@@ -417,9 +420,9 @@ Ngân sách: 18 chân. Board 30 chân đáp ứng được.
 
 ```
 Củ sạc 5V/3A ─► Jack DC ─► Domino
-                   ├─ +5V ─► Relay VCC, HC-SR04 VCC, COM relay 1/2
+                   ├─ +5V ─► Relay VCC, HC-SR04 VCC, COM relay 1/2/3
                    │         Tụ 1000µF (+ vào +5V, vạch vào GND)
-                   └─ GND ─► Relay GND, HC-SR04 GND, (−) bơm/quạt, GND ESP32  ◄ BẮT BUỘC chung
+                   └─ GND ─► Relay GND, HC-SR04 GND, (−) bơm/quạt/đèn, GND ESP32  ◄ BẮT BUỘC chung
 ESP32 3V3 ─► DHT22, BH1750, OLED
 ESP32 GPIO32 ─► VCC cảm biến đất ×2 (chỉ bật khi đo)
 Giai đoạn lắp/test: ESP32 cấp qua USB. Chạy độc lập: +5V domino ─► VIN ESP32.
@@ -443,7 +446,7 @@ Giai đoạn lắp/test: ESP32 cấp qua USB. Chạy độc lập: +5V domino �
 ### 5.5. Sơ đồ khối
 
 ```
-[Đất×2]──┐                       ┌──►[Relay]──►[Bơm] [Quạt]
+[Đất×2]──┐                       ┌──►[Relay]──►[Bơm] [Quạt] [Đèn]
 [DHT22]──┤                       │
 [BH1750]─┼──►[ESP32 Node 1]──────┼──►[OLED]
 [HC-SR04]┤        ▲   │          │
@@ -462,7 +465,7 @@ Giai đoạn lắp/test: ESP32 cấp qua USB. Chạy độc lập: +5V domino �
 | Cho AI | Lá cà chua bệnh thật, hoặc ảnh in màu lá bệnh từ tập test |
 | Nên có | Thêm 1 breadboard; giá đỡ cố định camera |
 | Nếu chế quạt từ động cơ mini | Cánh quạt nhựa vừa trục, giá kẹp động cơ (C3) |
-| Tùy chọn | Dải LED 5 V (nếu muốn có cơ cấu chiếu sáng) |
+| Bắt buộc | Đèn LED 5 V ánh trắng ≤ 5 W cho chiếu sáng bổ sung (§6.11) |
 
 ### 5.7. Hiệu chuẩn
 
@@ -575,6 +578,8 @@ Khóa an toàn **luôn áp dụng**, ở mọi chế độ và mọi nguồn l�
 2. Một lần bơm không quá `pump_max_s` (lệnh xin lâu hơn → `duration_capped`).
 3. Còn trong cooldown thì từ chối (`blocked_cooldown`). Lệnh tay được bỏ qua cooldown nếu cấu hình `manual_ignores_cooldown=true`.
 4. Mất điện hoặc reboot: tải ở NO nên tự tắt. Khởi động vào trạng thái tắt hết.
+5. Quá nóng (`air_temp ≥ temp_high + 3`): tắt đèn, lệnh bật đèn bị từ chối (`blocked_overheat`) (§6.11).
+6. Mọi lần **bật** relay lệch nhau ≥ 400 ms để tránh sụt áp; tắt relay luôn chạy ngay (§6.11).
 
 ### 6.7. Mạng và độ tin cậy
 
@@ -595,13 +600,13 @@ Khóa an toàn **luôn áp dụng**, ở mọi chế độ và mọi nguồn l�
 **OLED** có 3 trang, đổi trang bằng phím `#`:
 
 1. Đất 1/2, nhiệt độ, độ ẩm, ánh sáng, mực bể.
-2. Trạng thái bơm/quạt, chế độ, khóa an toàn đang bật.
+2. Trạng thái bơm/quạt/đèn (kèm khung giờ chiếu sáng), chế độ, khóa an toàn đang bật.
 3. WiFi/MQTT, IP, `device_code`, fw version.
 
 **Keypad:**
 
 - `*` + PIN 4 số + `#`: vào chế độ LOCAL trong 60 s. PIN nằm trong `secrets.h` hoặc cấu hình.
-- Trong LOCAL: `1` bật/tắt bơm (chịu khóa an toàn), `2` bật/tắt quạt, `3` chuyển AUTO/MANUAL, `0` thoát.
+- Trong LOCAL: `1` bật/tắt bơm (chịu khóa an toàn), `2` bật/tắt quạt, `3` chuyển AUTO/MANUAL, `4` bật/tắt đèn, `0` thoát.
 - Mỗi thao tác gửi `event: local_override {action}`.
 
 ### 6.9. Thư viện (Arduino IDE 2 — Library Manager)
@@ -624,6 +629,94 @@ Board: `NodeMCU-32S`. Cách cài và bảng cấu hình menu Tools ở `huong-da
 #define DEVICE_SECRET    "..."      // nhận một lần khi cấp phát
 #define LOCAL_PIN        "...."
 ```
+
+### 6.11. Chiếu sáng bổ sung (đèn LED)
+
+**Mục tiêu:** cây giống cà chua đủ 14 giờ sáng mỗi ngày và có đêm tối hoàn toàn. Đèn chỉ **bù** khi ánh sáng tự nhiên thiếu (trời âm u, mưa, chiều muộn). Đèn không thay ánh sáng ban ngày và không bật ban đêm.
+
+**Phần cứng**
+
+| Hạng mục | Chốt |
+|---|---|
+| Đèn | Dải LED hoặc đèn LED USB **5 V ánh trắng (phổ đầy đủ)**, ≤ 5 W (≤ 1 A). Không dùng đèn tím đỏ–xanh vì làm sai màu lá trong ảnh AI |
+| Đấu nối | Relay **kênh 3**, IN3 = **GPIO25**: `+5V → COM3`, `NO3 → (+) đèn`, `(−) đèn → GND`. Không cần diode (LED không phải tải cảm ứng) |
+| Nguồn | **Dùng chung củ sạc 5V/3A** (C25), chọn đèn công suất thấp ≤ 5 W. Ước lượng khi bơm, quạt, đèn và ESP32 cùng chạy: dưới 2 A |
+| Vị trí | Đèn cách khay 20–30 cm, chiếu thẳng xuống. BH1750 đặt tránh ánh đèn chiếu thẳng (quay ra phía cửa sổ hoặc có tấm chắn phía trên) |
+| Hiệu chuẩn | Đo ΔE_LED (`lamp_self_lux`): phòng tối, đọc BH1750 khi đèn tắt và khi đèn bật, lấy hiệu số. Ghi vào `hardware/nhat-ky-lap-dat.md` |
+
+**Cấu hình** (`config`, §8.7)
+
+| Khóa | Mặc định | Miền | Ý nghĩa |
+|---|---|---|---|
+| `lamp_start_hour` | 6 | 0–23 | Đầu khung chiếu sáng, giờ Việt Nam (UTC+7) |
+| `lamp_end_hour` | 20 | 1–24, > `lamp_start_hour` | Cuối khung. Khung là `[start, end)` |
+| `lamp_lux_low` | 800 | 0–65535 | Ngưỡng bật: lux đo được dưới mức này |
+| `lamp_hyst` | 700 | > `lamp_self_lux` + 200 | Ngưỡng tắt = `lamp_lux_low` + `lamp_hyst` (mặc định 1500 lux) |
+| `lamp_self_lux` | 300 | 0–5000 | ΔE_LED đo khi hiệu chuẩn |
+| `lamp_hold_s` | 10 | 2–600 | Điều kiện bật hoặc tắt phải đúng **liên tục** trong khoảng này mới đổi relay |
+| `lamp_min_on_s` / `lamp_min_off_s` | 30 / 30 | 10–3600 | Thời gian giữ tối thiểu sau mỗi lần đổi trạng thái. Chạy thật nên đặt 300–600 |
+| `lamp_override_min` | 60 | 1–240 | Thời gian giữ hiệu lực của lệnh tay khi đang AUTO |
+
+Thiết bị từ chối cấu hình (`invalid`) nếu `lamp_end_hour ≤ lamp_start_hour` hoặc `lamp_hyst ≤ lamp_self_lux + 200`. Điều kiện thứ hai đảm bảo khi đèn đang bật, phần sáng do chính đèn tạo ra không đủ để vượt ngưỡng tắt, nên đèn không tự bật/tắt liên tục.
+
+**Logic AUTO** (đánh giá mỗi 2 s, theo thứ tự ưu tiên)
+
+| # | Điều kiện | Đèn | `reason` | Áp dụng |
+|---|---|---|---|---|
+| 1 | Chưa đồng bộ NTP | Không tự bật (đang bật thì giữ tới hết override) | — | — |
+| 2 | Ngoài khung `[lamp_start_hour, lamp_end_hour)` | TẮT | `window_end` | **Ngay**, bỏ qua debounce và thời gian giữ |
+| 3 | Khóa nhiệt: bật khi `air_temp ≥ temp_high + 3`, nhả khi `air_temp ≤ temp_high + 3 − temp_hyst` | TẮT | `overheat` | **Ngay** |
+| 4 | BH1750 lỗi (`light.ok = false`) | **BẬT theo lịch** suốt khung giờ | `sensor_fallback` | Kèm event `sensor_fault {bh1750}` đã có |
+| 5 | Đèn đang tắt và lux < `lamp_lux_low` | BẬT | `low_light` | Debounce + thời gian giữ |
+| 6 | Đèn đang bật và lux ≥ `lamp_lux_low` + `lamp_hyst` | TẮT | `bright` | Debounce + thời gian giữ |
+| 7 | Còn lại | Giữ nguyên | — | — |
+
+- **Debounce:** trạng thái mong muốn khác trạng thái hiện tại phải duy trì liên tục `lamp_hold_s` (mặc định 10 s = 5 chu kỳ đọc). Bị ngắt quãng (người đi qua che cảm biến vài giây) thì đếm lại từ đầu.
+- **Thời gian giữ:** sau khi đổi trạng thái, phải qua `lamp_min_on_s` (đang bật) hoặc `lamp_min_off_s` (đang tắt) mới xét đổi tiếp ở dòng 5–6.
+- Lux dùng giá trị đã lọc trung vị của `sensors` (§6.3).
+
+**Lệnh tay và chế độ**
+
+- Lệnh `lamp_on {duration_min?}` (1–`lamp_override_min`, mặc định `lamp_override_min`) và `lamp_off`.
+- **AUTO:** lệnh tay giữ hiệu lực tối đa `lamp_override_min`, sau đó trả về logic AUTO (`reason: override_end`). Bật tay ban đêm được phép để người vận hành kiểm tra cây, nhưng hết thời gian là tự tắt.
+- **MANUAL:** đèn chỉ chạy theo lệnh, không tự tắt theo lịch.
+- **LOCAL:** keypad phím `4` bật/tắt đèn.
+- Khóa nhiệt (dòng 3) áp dụng ở **mọi** chế độ: lệnh bật khi quá nóng bị từ chối với `blocked_overheat`.
+
+**Lệch pha khi bật relay (áp dụng cho bơm, quạt, đèn)**
+
+- Mọi lần **bật** relay đi qua hàng đợi: relay chỉ được đóng khi đã qua ≥ 400 ms kể từ lần đóng relay trước. Tránh dòng khởi động của bơm, quạt và đèn cộng dồn làm sụt áp thanh 5 V.
+- **Tắt relay luôn chạy ngay**, không xếp hàng.
+- Làm bằng `millis()`, không dùng `delay()`. Thời gian bơm và timer cắt bơm (§6.6) tính từ lúc relay **thực sự đóng**.
+
+**Giao thức** (bổ sung §8)
+
+| Thành phần | Bổ sung |
+|---|---|
+| telemetry `state` | `lamp: 0/1`. Tên `lamp` để không nhầm với metric `light` (lux) |
+| telemetry `locks` | Thêm `overheat` |
+| event | `lamp_on` / `lamp_off`, `detail: {source: auto/remote/local, reason}`. `reason` ∈ `low_light`, `bright`, `window_end`, `overheat`, `sensor_fallback`, `command`, `override_end`, `shutdown` (trước khi khởi động lại) |
+| command | `lamp_on {duration_min?}`, `lamp_off` |
+| ack | `blocked_overheat` → REJECTED |
+| config | Các khóa `lamp_*` ở trên |
+
+**Phối hợp với camera AI (Node 2)**
+
+- Không cho hai node điều khiển trực tiếp lẫn nhau (D3, D5). Node 2 vẫn dùng flash `auto` như cũ.
+- Backend ghi trạng thái đèn tại thời điểm chụp vào `diagnoses.lamp_on`, lấy từ telemetry gần nhất của Node 1 trong cùng vườn.
+- Khi thu thập dữ liệu và đánh giá AI (§15.3) thì tách số liệu theo `lamp_on` để thấy ảnh hưởng của ánh đèn.
+
+**Backend và giao diện**
+
+- Kiểm tra lệnh `lamp_on`/`lamp_off` cho thiết bị loại CONTROLLER, kiểm tra các khóa cấu hình `lamp_*`.
+- Màn Điều khiển: nút Đèn. Màn Cấu hình: nhóm "Lịch chiếu sáng" (khung giờ, ngưỡng lux, thời gian giữ).
+- Chỉ số **"Số giờ chiếu sáng hôm nay"** trên chi tiết thiết bị, tính từ event `lamp_on`/`lamp_off`.
+
+**OLED:** trang 2 thêm dòng `Den: BAT (06-20)`.
+
+**Demo:** gửi cấu hình `lamp_start_hour = 0`, `lamp_end_hour = 24` để demo được ở mọi giờ. Lấy tay che BH1750: khoảng 10 s sau đèn bật, dashboard hiện event `lamp_on {reason: low_light}`. Demo xong gửi lại cấu hình 6–20, vì 0–24 làm mất giờ tối bắt buộc của cây.
+
+**Hạn chế:** BH1750 đo lux (theo mắt người), không đo PAR/PPFD như cảm biến chuyên dụng của nhà kính thật. Ngưỡng lux là ước lượng, cần chỉnh theo phòng thực tế.
 
 ---
 
@@ -716,11 +809,11 @@ nursery/{garden_code}/{device_code}/config      ↓ QoS1  retain:yes
     "light":   {"v": 1830, "u": "lux", "ok": true},
     "tank":    {"v": 62,   "u": "%",   "ok": true, "raw_cm": 11.4}
   },
-  "state": {"pump": 0, "fan": 1, "mode": "AUTO", "locks": []}
+  "state": {"pump": 0, "fan": 1, "lamp": 0, "mode": "AUTO", "locks": []}
 }
 ```
 
-`locks` là mảng con của `["no_water","cooldown","soil_fault","local"]`.
+`locks` là mảng con của `["no_water","cooldown","soil_fault","local","overheat"]`.
 
 ### 8.4. status
 
@@ -743,6 +836,7 @@ LWT, đặt lúc CONNECT: `{"v":1,"device_id":"ctl-0001","online":false}`.
 |---|---|
 | `pump_on` / `pump_off` | Bơm đổi trạng thái. `detail.source`: `auto` / `remote` / `local`; `detail.duration_s` |
 | `fan_on` / `fan_off` | Quạt đổi trạng thái |
+| `lamp_on` / `lamp_off` | Đèn đổi trạng thái. `detail.source`, `detail.reason` (§6.11) |
 | `tank_low` / `tank_ok` | Qua ngưỡng `tank_min` (có trễ 3%) |
 | `sensor_fault` / `sensor_ok` | `detail.sensor`: `soil1`, `soil2`, `soil_mismatch`, `dht`, `bh1750`, `ultrasonic`, `camera` |
 | `local_override` | Thao tác keypad |
@@ -764,6 +858,8 @@ Lệnh xuống:
 |---|---|---|
 | Node 1 | `pump_on` | `duration_s` 1–`pump_max_s` |
 | Node 1 | `pump_off`, `fan_on`, `fan_off` | — |
+| Node 1 | `lamp_on` | `duration_min` 1–`lamp_override_min` (tùy chọn) |
+| Node 1 | `lamp_off` | — |
 | Node 1 | `set_mode` | `mode`: `AUTO` / `MANUAL` |
 | Cả hai | `reboot`, `request_status` | — |
 | Node 2 | `capture`, `flash` | §7.4 |
@@ -778,7 +874,7 @@ Ack lên:
 | `result` | Trạng thái lệnh ở backend |
 |---|---|
 | `executed`, `duration_capped` | EXECUTED |
-| `blocked_no_water`, `blocked_cooldown`, `blocked_sensor_fault`, `blocked_local`, `invalid`, `expired`, `unsupported` | REJECTED |
+| `blocked_no_water`, `blocked_cooldown`, `blocked_sensor_fault`, `blocked_local`, `blocked_overheat`, `invalid`, `expired`, `unsupported` | REJECTED |
 | `failed` | FAILED |
 | (không có ack sau 10 s) | TIMEOUT |
 
@@ -792,6 +888,8 @@ Ack lên:
            "soil_cal":{"s1":{"dry":3150,"wet":1320},"s2":{"dry":3210,"wet":1290}},
            "tank_cal":{"empty_cm":25.0,"full_cm":5.0}}}
 ```
+
+Node 1 có thêm các khóa chiếu sáng `lamp_*` (§6.11).
 
 Thiết bị xử lý cấu hình như sau:
 
@@ -1209,6 +1307,7 @@ CREATE TABLE diagnoses (
   captured_at TIMESTAMPTZ NOT NULL,
   trigger VARCHAR(10) NOT NULL,            -- schedule / command
   cmd_id UUID,
+  lamp_on BOOLEAN,                         -- trạng thái đèn Node 1 lúc chụp (§6.11)
   status diag_status NOT NULL DEFAULT 'QUEUED',
   model_version VARCHAR(30),
   tiles JSONB,                             -- [{r,c,label,conf,probs:{...}}] × 9
@@ -1606,7 +1705,7 @@ Khi demo phải nói rõ ảnh in là đầu vào kiểm thử. Chuẩn bị vid
 | Đăng nhập | Tất cả | Form, thông báo lỗi, thông báo khóa tạm |
 | Dashboard | Tất cả | Thẻ thiết bị (trạng thái + online), giá trị mới nhất có màu theo ngưỡng (kèm chữ), cảnh báo đang mở, ảnh chẩn đoán mới nhất |
 | Chi tiết thiết bị | Theo gán | Thông tin, trạng thái vòng đời, fw/hw, last seen, biểu đồ realtime 1 giờ, lịch sử sự kiện, lịch sử lệnh |
-| Điều khiển | CONTROL | Nút bơm (chọn thời gian), quạt, chế độ, chụp ảnh. Mỗi nút hiển thị trạng thái lệnh PENDING → kết quả |
+| Điều khiển | CONTROL | Nút bơm (chọn thời gian), quạt, đèn, chế độ, chụp ảnh. Mỗi nút hiển thị trạng thái lệnh PENDING → kết quả |
 | Cấu hình | CONTROL | Form ngưỡng có kiểm tra; trạng thái "chờ thiết bị áp dụng"; lịch sử phiên bản |
 | Lịch sử dữ liệu | Theo gán | Chọn metric và khoảng thời gian, biểu đồ đường, bảng, min/max/avg, nút xuất CSV |
 | Cảnh báo | Theo gán (xử lý: CONTROL) | Lọc theo trạng thái/mức/thiết bị; xác nhận; đóng có ghi chú |
@@ -1813,6 +1912,8 @@ Dùng để phát triển backend khi chưa có phần cứng, và để đo NFR
 | FT10 | Chụp và chẩn đoán | Lệnh chụp; ảnh lá bệnh 3 lần | Diagnosis DONE; cảnh báo AI_LEAF |
 | FT11 | Mất mạng | Tắt router 10 phút rồi bật lại | Node 1 vẫn tưới; gửi bù đủ, `seq` liên tục |
 | FT12 | Keypad / LOCAL | Nhập PIN, bật bơm tại chỗ | event `local_override`; lệnh từ xa bị `blocked_local` |
+| FT13 | Chiếu sáng bổ sung | (a) Ngoài khung giờ, che kín BH1750; (b) trong khung giờ, che BH1750 3 s rồi bỏ ra; (c) che liên tục 15 s; (d) chiếu đèn pin để lux ≥ 1500; (e) rút dây BH1750; (f) hạ `temp_high` để vượt khóa nhiệt | (a) đèn không bật; (b) không đổi; (c) đèn bật `low_light`; (d) tắt `bright` sau thời gian giữ; (e) bật theo lịch `sensor_fallback` + `sensor_fault`; (f) tắt `overheat`, lệnh bật bị `blocked_overheat` |
+| FT14 | Lệch pha relay | Hạ ngưỡng để AUTO muốn bật bơm, quạt, đèn cùng lúc | Log cho thấy 3 relay đóng cách nhau ≥ 400 ms; tắt thì đồng thời |
 
 ### 19.2. Kiểm thử phi chức năng
 
@@ -1887,7 +1988,7 @@ Lộ trình cũ (G1–G5) được thay từ 05/11 cho mốc demo khoảng **18/
 |---|---|---|
 | N0 — Nền tảng Windows | 05–06/11 | Công cụ trong `tools/`, script `setup/start/stop/status`, CSDL + seed, broker + kiểm chứng dynsec (C18), hotspot + tường lửa, thiết bị mô phỏng gửi telemetry |
 | N1 — Bộ xương xuyên suốt | 07–09/11 | Backend: auth, devices, ingest, WebSocket; web: đăng nhập + dashboard realtime; Node 1 lắp xong, qua `test-hardware`, nối broker thật; tải dataset, huấn luyện giai đoạn 1 trên Colab |
-| N2 — Nghiệp vụ | 10–12/11 | Lệnh + ack, cấu hình, cấp phát/khóa/thu hồi qua dynsec, offline, cảnh báo + Telegram, audit; firmware Node 2 chụp + upload |
+| N2 — Nghiệp vụ | 10–12/11 | Lệnh + ack, cấu hình, cấp phát/khóa/thu hồi qua dynsec, offline, cảnh báo + Telegram, audit; firmware Node 2 chụp + upload; đèn chiếu sáng Node 1 (§6.11) |
 | N3 — Ảnh và AI | 13–14/11 | Nhận ảnh, hàng đợi chẩn đoán, AI service suy luận, luật AI_LEAF, màn hình ảnh |
 | N4 — Diễn tập | 15–17/11 | Chạy đủ 10 bước + AI nhiều lần, sửa lỗi, quay video dự phòng, sao lưu |
 | Demo | khoảng 18/11 | |
@@ -1924,7 +2025,7 @@ Chốt ngày 04/11/2026, sửa ngày 05/11/2026 (đánh dấu **sửa 05/11**). 
 |---|---|---|---|
 | C1 | Ngôn ngữ backend | FastAPI (Python) | §1.3 |
 | C2 | Chip OLED | SH1106, thư viện U8g2 | §5.1, §6.9 |
-| C3 | Quạt và động cơ mini | Chỉ **1 quạt**, trên relay kênh 2 (GPIO27). Quạt là quạt 5 V có sẵn hoặc động cơ mini gắn cánh. Relay kênh 3 để trống | D10, §5.1 |
+| C3 | Quạt và động cơ mini | Chỉ **1 quạt**, trên relay kênh 2 (GPIO27). Quạt là quạt 5 V có sẵn hoặc động cơ mini gắn cánh. Relay kênh 3 dùng cho đèn (C25) | D10, §5.1 |
 | C4 | DHT11 trên Node 2 | Không gắn. Node 2 chỉ chụp ảnh | §5.4, §7.1 |
 | C5 | MQTT/TLS | **Sửa 05/11:** kênh thiết bị không mã hóa trong hotspot WPA2 riêng, ghi hạn chế. Demo chạy HTTP; HTTPS cho web (uvicorn + mkcert, cổng 8443) làm ở N5 nếu kịp | §14.2 |
 | C6 | 403 hay 404 | Không được gán → 404; được gán VIEW mà thao tác → 403 | §10.1, ST1 |
@@ -1946,6 +2047,7 @@ Chốt ngày 04/11/2026, sửa ngày 05/11/2026 (đánh dấu **sửa 05/11**). 
 | C22 | Một thư mục | **Mới 05/11:** toàn bộ công cụ, dữ liệu, cấu hình, log (kể cả nhật ký trợ lý AI) nằm trong thư mục repo; phần không commit nằm trong `.gitignore`; đường dẫn tương đối theo gốc repo | §17.2 |
 | C24 | Mô hình AI | **Mới 06/11:** dùng mô hình tiền huấn luyện công khai trên PlantVillage, gộp nhãn về 3 lớp; không tự huấn luyện trước demo. Fine-tune 3 giai đoạn là hướng phát triển | §15.5 |
 | C23 | Lịch và phạm vi | **Mới 05/11:** demo khoảng 18/11 trên máy này, 2–3 người. Ưu tiên đủ 10 bước demo + AI; phần còn lại làm sau demo | §21.2 |
+| C25 | Đèn chiếu sáng | **Mới 07/11:** đèn LED 5 V ánh trắng công suất thấp trên relay kênh 3, **dùng chung củ sạc 5V/3A**; khung giờ 6–20 + bù theo lux có trễ, debounce, thời gian giữ; **BH1750 lỗi thì bật theo lịch**; khóa nhiệt; mọi lần bật relay lệch nhau 400 ms | §6.11 |
 
 ---
 

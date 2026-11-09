@@ -13,6 +13,8 @@ const char* controlCommand(const char* action, JsonObjectConst params, JsonObjec
 
 bool pumpIsOn();
 bool fanIsOn();
+bool lampIsOn();
+bool overheatActive();
 bool modeIsAuto();
 uint8_t modeCode();          // 0 AUTO, 1 MANUAL, 2 LOCAL
 const char* modeName();
@@ -26,4 +28,5 @@ void localTouch();           // gia hạn 60 s mỗi lần bấm phím
 bool localActive();
 uint32_t localRemainingS();
 
-void controlAllOff();        // tắt bơm và quạt ngay (dùng trước khi reboot)
+void controlAllOff();        // tắt bơm, quạt, đèn ngay (dùng trước khi reboot)
+void controlPrint();         // in trạng thái đèn/relay ra Serial

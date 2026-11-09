@@ -1,6 +1,6 @@
 # Hướng dẫn lắp đặt phần cứng — Hệ thống chăm sóc vườn ươm thông minh
 
-> Áp dụng cho bộ linh kiện hiện có của nhóm · v1.2 · 04/11/2026 (OLED SH1106, cảm biến đất cấp nguồn qua GPIO32)
+> Áp dụng cho bộ linh kiện hiện có của nhóm · v1.3 · 07/11/2026 (OLED SH1106, cảm biến đất cấp nguồn qua GPIO32, đèn LED trên relay kênh 3)
 >
 > Bảng gán chân khớp với `dac-ta-he-thong.md` §5. Nếu đổi chân nào, sửa cả hai tài liệu và firmware.
 
@@ -10,7 +10,7 @@
 
 - **Phần A — Chuẩn bị:** A1 nguyên tắc vàng · A2 dụng cụ · A3 kiểm tra linh kiện trước khi lắp · A4 quy ước dây · A5 cách đo bằng đồng hồ vạn năng · A6 cài Arduino IDE 2 và thư viện
 - **Phần B — Bức tranh tổng thể Node 1:** B1 sơ đồ khối · B2 hai nhánh nguồn · B3 bảng đấu dây tổng hợp · B4 thứ tự lắp
-- **Phần C — Lắp Node 1 theo 11 công đoạn**
+- **Phần C — Lắp Node 1 theo 11 công đoạn** (+ C9b đèn)
 - **Phần D — Lắp Node 2 (ESP32-CAM)**
 - **Phần E — Lắp đặt vào mô hình vườn ươm**
 - **Phần F — Nghiệm thu cuối và xử lý lỗi**
@@ -74,6 +74,7 @@
 | 19 | ESP32-CAM OV2640 + đế nạp MB | Node 2 | Cáp camera đã gắn chặt |
 | 20 | DHT11 | Dự phòng | Không gắn lên Node 2 (đặc tả C4) |
 | 21 | Củ sạc 5V/3A, 5V/2A | Nguồn | Đo điện áp ra trước khi dùng |
+| 22 | Đèn LED 5 V ánh trắng ≤ 5 W (**cần mua**) | Node 1 — relay kênh 3 | Xem công suất trên nhãn; không dùng đèn tím |
 
 ### Còn thiếu: đầu nối nguồn từ củ sạc vào domino
 
@@ -363,7 +364,7 @@ Ghim phiên bản (ví dụ `bblanchon/ArduinoJson @ 7.x.x`) theo đúng `LIBRAR
                          ┌───────────────── ESP32 (cấp bằng USB khi lắp ráp) ─────────────────┐
   [Đất 1]  AO ──────────►│ GPIO34                                       GPIO26 ├──► Relay IN1 ─► Bơm
   [Đất 2]  AO ──────────►│ GPIO35                                       GPIO27 ├──► Relay IN2 ─► Quạt
-  [DHT22]  OUT ─────────►│ GPIO4                                        GPIO25 ├──► Relay IN3 (dự phòng)
+  [DHT22]  OUT ─────────►│ GPIO4                                        GPIO25 ├──► Relay IN3 ─► Đèn  
   [BH1750]+[OLED] SDA ◄─►│ GPIO21                                              │
                   SCL ◄─►│ GPIO22                                              │
   [HC-SR04] TRIG ◄───────│ GPIO5                                               │
@@ -375,8 +376,8 @@ Ghim phiên bản (ví dụ `bblanchon/ArduinoJson @ 7.x.x`) theo đúng `LIBRAR
                          │ GND ──┐                                             │
                          └───────┼─────────────────────────────────────────────┘
                                  │  (GND chung — BẮT BUỘC)
-  Củ sạc 5V/3A ─► Domino ── +5V ─┼─► Relay VCC, HC-SR04 VCC, COM relay 1, 2
-                          └─ GND ┴─► Relay GND, HC-SR04 GND, (−) bơm, (−) quạt
+  Củ sạc 5V/3A ─► Domino ── +5V ─┼─► Relay VCC, HC-SR04 VCC, COM relay 1, 2, 3
+                          └─ GND ┴─► Relay GND, HC-SR04 GND, (−) bơm, (−) quạt, (−) đèn
                              Tụ 1000µF giữa +5V và GND
 ```
 
@@ -385,7 +386,7 @@ Ghim phiên bản (ví dụ `bblanchon/ArduinoJson @ 7.x.x`) theo đúng `LIBRAR
 | Nhánh | Nguồn | Cấp cho | Vì sao tách |
 |---|---|---|---|
 | **3,3 V logic** | Chân 3V3 của ESP32 (ESP32 lấy điện từ USB); riêng cảm biến đất lấy từ GPIO32 | Cảm biến đất ×2, DHT22, BH1750, OLED | Mức tín hiệu khớp với GPIO 3,3 V |
-| **5 V công suất** | Củ sạc 5V/3A → domino | Relay, HC-SR04, bơm, quạt | Bơm và quạt kéo dòng lớn và gây nhiễu; không để dòng này đi qua ESP32 |
+| **5 V công suất** | Củ sạc 5V/3A → domino | Relay, HC-SR04, bơm, quạt, đèn | Bơm và quạt kéo dòng lớn và gây nhiễu; không để dòng này đi qua ESP32 |
 
 - **Trong lúc lắp và test:** ESP32 lấy điện từ USB máy tính, nhánh 5 V lấy từ củ sạc. Hai nhánh **chỉ nối chung GND**. Không nối +5 V domino vào VIN.
 - **Khi chạy độc lập** (không còn máy tính): rút USB, nối +5 V domino vào chân **VIN** của ESP32 (§C11).
@@ -394,12 +395,13 @@ Ngân sách dòng nhánh 5 V (ước lượng):
 
 | Tải | Dòng |
 |---|---|
-| Cuộn relay | ~70 mA/kênh × 2 |
+| Cuộn relay | ~70 mA/kênh × 3 |
 | Bơm | 100–300 mA (lúc khởi động cao hơn) |
 | Quạt | 100–200 mA |
+| Đèn LED ≤ 5 W | ≤ 1 A |
 | HC-SR04 | 15 mA |
 | ESP32 (khi chạy độc lập) | ~250 mA đỉnh |
-| **Tổng** | **< 1 A**. Củ 3 A đủ dư |
+| **Tổng** | **< 2 A**. Củ 3 A vẫn đủ, đèn dùng chung nguồn (đặc tả C25) |
 
 ## B3. Bảng đấu dây tổng hợp Node 1
 
@@ -415,11 +417,12 @@ Ngân sách dòng nhánh 5 V (ước lượng):
 | Keypad | 4 dây hàng | **GPIO13, 14, 16, 17** | Đế ra chân |
 | Keypad | 3 dây cột | **GPIO19, 23, 33** | Đế ra chân |
 | Relay 4 kênh | VCC / GND | +5V domino / GND domino | |
-| Relay 4 kênh | IN1 / IN2 / IN3 / IN4 | **GPIO26** / **GPIO27** / GPIO25 / để trống | Đế ra chân |
+| Relay 4 kênh | IN1 / IN2 / IN3 / IN4 | **GPIO26** / **GPIO27** / **GPIO25** / để trống | Đế ra chân |
 | Relay kênh 1 | COM / NO / NC | +5V domino / (+) bơm / để trống | Cọc vít |
 | Relay kênh 2 | COM / NO / NC | +5V domino / (+) quạt / để trống | Cọc vít |
-| Bơm, quạt | (−) | GND domino | |
-| Diode 1N4007 | ×2 | Song song ngược với bơm, với quạt | Tại cọc vít hoặc đầu dây tải |
+| Relay kênh 3 | COM / NO / NC | +5V domino / (+) đèn / để trống | Cọc vít |
+| Bơm, quạt, đèn | (−) | GND domino | |
+| Diode 1N4007 | ×2 | Song song ngược với bơm, với quạt (đèn LED không cần) | Tại cọc vít hoặc đầu dây tải |
 | Tụ 1000 µF | (+) / (−) | +5V / GND domino | |
 
 **Chân tránh dùng:** GPIO0, 2, 12, 15 (ảnh hưởng chế độ khởi động); 6–11 (flash nội); 1, 3 (Serial).
@@ -439,6 +442,7 @@ Ngân sách dòng nhánh 5 V (ước lượng):
 | C7 | HC-SR04 + cầu chia áp | USB + củ sạc, chung GND |
 | C8 | Module relay, **chưa nối tải** | USB + củ sạc |
 | C9 | Quạt + diode vào relay 2 | USB + củ sạc |
+| C9b | Đèn LED vào relay 3 + hiệu chuẩn ΔE_LED | USB + củ sạc |
 | C10 | Bơm + diode vào relay 1 | USB + củ sạc |
 | C11 | Chạy độc lập (VIN) và đi dây gọn | Củ sạc |
 
@@ -763,7 +767,7 @@ ECHO ra 5 V. Qua cầu chia: 5 × 2/(1+2) ≈ **3,33 V**, an toàn cho ESP32.
 ```
 Relay VCC ──► +5V domino        Relay GND ──► GND domino
 Relay IN1 ──► GPIO26 (bơm)      Relay IN2 ──► GPIO27 (quạt)
-Relay IN3 ──► GPIO25 (dự phòng) Relay IN4 ──► để trống
+Relay IN3 ──► GPIO25 (đèn)      Relay IN4 ──► để trống
 ```
 
 **Bước 1: đặt jumper mức kích H/L cho từng kênh — chọn H.**
@@ -842,6 +846,64 @@ Diode 1N4007 song song với quạt: vạch bạc (K) về phía dây (+), đầ
 | 3 | Theo dõi Serial trong lúc quạt chạy và tắt | ESP32 **không** in thông báo khởi động lại (`rst:` hoặc `Brownout`) |
 | 4 | Đo +5 V domino trong lúc quạt chạy | Không thấp hơn 4,8 V |
 
+## C9b. Đèn LED vào relay kênh 3
+
+**Mục đích:** chiếu sáng bổ sung cho khay cây (đặc tả §6.11). Đèn là tải nhẹ và không sinh xung ngược.
+
+**Chuẩn bị đèn:**
+
+- Đèn LED **5 V ánh trắng (phổ đầy đủ)**, công suất thấp ≤ 5 W, dùng **chung củ sạc 5V/3A** (đặc tả C25). Dòng ≈ công suất ÷ 5 V, ví dụ 5 W ≈ 1 A.
+- **Không** dùng đèn tím (đỏ + xanh dương): ánh tím làm sai màu lá trong ảnh Node 2, AI dễ nhầm lá vàng và lá đốm.
+- Đèn có đầu cắm USB: dùng một đầu USB cái có dây ra (để không phải cắt cáp đèn), hoặc cắt cáp và tách 2 dây nguồn. Dây đỏ là (+), dây đen là (−). Cáp có thêm dây dữ liệu (xanh lá, trắng) thì bọc riêng, không nối.
+
+**Nối với cái gì:**
+
+```
++5V domino ──► COM kênh 3
+NO kênh 3  ──► (+) đèn
+(−) đèn ──► GND domino
+Không cần diode (LED không phải tải cảm ứng như bơm, quạt)
+```
+
+**Các bước:**
+
+1. **Rút nguồn.** Siết dây (+) đèn vào NO kênh 3, nối COM kênh 3 với +5 V domino, nối dây (−) đèn vào GND domino.
+2. Treo đèn cách mặt khay **20–30 cm**, chiếu thẳng xuống.
+3. Đặt BH1750 sao cho **đèn không chiếu thẳng vào mặt cảm biến**: quay mặt cảm biến ra phía cửa sổ, hoặc dán một tấm bìa nhỏ phía trên, chắn giữa đèn và cảm biến. Nếu không, cảm biến đo cả ánh đèn và đèn sẽ tự bật/tắt liên tục.
+
+**Lưu ý:**
+
+- Bơm, quạt, đèn ≤ 5 W và ESP32 cùng chạy tốn dưới 2 A, củ 3 A vẫn đủ.
+- Đèn không sáng khi relay đã kêu "tách": thường là đảo cực đèn hoặc đấu nhầm NC. Rút nguồn rồi sửa, đừng để đảo cực lâu.
+
+**Kiểm tra thành công:**
+
+| # | Kiểm tra | Kết quả đúng |
+|---|---|---|
+| 1 | Cấp nguồn, gõ `3` | Đèn sáng 3 giây rồi tắt |
+| 2 | Theo dõi Serial lúc đèn bật và tắt | ESP32 **không** khởi động lại |
+| 3 | Gõ `2` rồi `3` ngay | Quạt và đèn cùng chạy, ESP32 ổn định |
+| 4 | Đo +5 V domino lúc quạt và đèn cùng chạy (nếu có đồng hồ) | Không thấp hơn 4,8 V |
+
+**Hiệu chuẩn độ sáng do chính đèn tạo ra (ΔE_LED → cấu hình `lamp_self_lux`):**
+
+1. Làm khi đèn và BH1750 đã ở **vị trí cuối cùng**, trong phòng tối (tắt đèn phòng, kéo rèm).
+2. Gõ `l` → ghi lux lúc đèn tắt (E0).
+3. Gõ `3`, rồi gõ `l` ngay trong 3 giây đèn đang sáng → ghi E1.
+4. Lặp bước 2–3 ba lần, lấy trung bình. **ΔE_LED = E1 − E0.**
+5. Ghi vào `hardware/nhat-ky-lap-dat.md`. Khi chạy firmware chính, gửi giá trị này vào cấu hình `lamp_self_lux`.
+6. Kiểm tra điều kiện **ΔE_LED + 200 < `lamp_hyst`** (mặc định 700, tức ΔE_LED phải dưới 500 lux). Không đạt thì che chắn BH1750 kỹ hơn hoặc dời đèn rồi đo lại, hoặc tăng `lamp_hyst` qua cấu hình. Firmware từ chối cấu hình vi phạm điều kiện này.
+
+**Lỗi:**
+
+| Hiện tượng | Nguyên nhân |
+|---|---|
+| Relay kêu nhưng đèn không sáng | Đấu nhầm NC, thiếu +5 V ở COM, đảo cực đèn, cọc vít lỏng |
+| Đèn sáng mờ | Củ sạc yếu; dây nguồn dài và nhỏ |
+| ΔE_LED trên 500 lux | BH1750 nhìn thẳng vào đèn: che chắn hoặc đổi hướng cảm biến |
+
+📸 Chụp ảnh vị trí đèn và BH1750 cho báo cáo.
+
 ---
 
 ## C10. Bơm chìm + diode vào relay kênh 1
@@ -881,7 +943,7 @@ Diode 1N4007 song song với bơm (vạch bạc về phía +), như quạt
 | 3 | Theo dõi Serial | ESP32 **không** khởi động lại |
 | 4 | Gõ `1` liên tiếp 10 lần | Lần nào cũng chạy, không reset, relay không dính |
 | 5 | Đo lượng nước trong 10 giây chạy | Ghi lại lưu lượng (ml/s) để chỉnh `pump_max_s` |
-| 6 | Chạy đồng thời bơm và quạt (gõ `1` rồi `2` ngay) | Cả hai chạy, ESP32 vẫn ổn định |
+| 6 | Chạy đồng thời bơm, quạt, đèn (gõ `1`, `2`, `3` liên tiếp) | Cả ba chạy, ESP32 vẫn ổn định |
 
 **Lỗi:**
 
@@ -1029,6 +1091,7 @@ Sau khi lắp vào mô hình, đo lại và ghi vào nhật ký:
 - [ ] Không còn đoạn dây trần thừa ra khỏi cọc vít.
 - [ ] Tụ 1000 µF đúng cực, không phồng.
 - [ ] Diode ở bơm và quạt đúng chiều (vạch về phía +).
+- [ ] Đèn nối NO kênh 3, BH1750 không bị đèn chiếu thẳng, đã đo ΔE_LED.
 - [ ] Chân ECHO đi qua cầu chia áp, đo được ≈ 3,3 V.
 - [ ] Mọi GND nối chung (đo thông mạch GND ESP32 ↔ GND domino ↔ GND relay ↔ GND HC-SR04).
 - [ ] Relay dùng NO, tắt hết khi khởi động.
@@ -1043,7 +1106,7 @@ Sau khi lắp vào mô hình, đo lại và ghi vào nhật ký:
 |---|---|---|---|
 | 1 | Toàn bộ cảm biến | Gõ lần lượt `d`, `s`, `l`, `u` | Đủ 4 loại số liệu, hợp lý |
 | 2 | Hiển thị và nhập | `o`, `k` | OLED hiện chữ, 12 phím đúng |
-| 3 | Cơ cấu chấp hành | `1`, `2` | Bơm, quạt chạy đúng kênh |
+| 3 | Cơ cấu chấp hành | `1`, `2`, `3` | Bơm, quạt, đèn chạy đúng kênh |
 | 4 | Ổn định nguồn | Bật bơm + quạt cùng lúc 10 lần | Không reset |
 | 5 | Chạy độc lập | Chỉ củ sạc, 1 giờ | Không reset, không nóng |
 | 6 | Node 2 | Stream + chụp + flash | Đủ, không brownout |
@@ -1088,7 +1151,7 @@ Một sketch riêng (`firmware/test-hardware/test-hardware.ino`), chạy qua Ser
 | `s` | Bật nguồn cảm biến đất (GPIO32), đọc ADC 10 lần, in trung bình, tắt nguồn | C4 |
 | `k` | In phím bấm từ keypad trong 20 giây; chế độ dò chân `kp`: in cặp GPIO thông nhau khi bấm phím | C5, Phụ lục 3 |
 | `u` | Đo HC-SR04 5 lần, in cm | C7 |
-| `1` / `2` / `3` | Bật relay kênh 1/2/3 trong 3 giây | C8–C10 |
+| `1` / `2` / `3` | Bật relay kênh 1 (bơm) / 2 (quạt) / 3 (đèn) trong 3 giây | C8–C10, C9b |
 | `r` | Đảo logic kích relay (mức H ↔ L) | C8 |
 | `a` | Đọc điện áp chân VP / GPIO36 (mV, đã hiệu chỉnh), 5 lần | Phụ lục 3 — thay đồng hồ đo tín hiệu ≤ 3,3 V |
 
@@ -1113,7 +1176,9 @@ Một sketch riêng (`firmware/test-hardware/test-hardware.ino`), chạy qua Ser
 | HC-SR04 tại 20 cm thước | ___ cm | |
 | `TANK_EMPTY_CM` / `TANK_FULL_CM` | ___ / ___ | |
 | Lưu lượng bơm | ___ ml / 10 s | |
-| Điện áp +5 V khi bơm + quạt cùng chạy | ___ V | |
+| Điện áp +5 V khi bơm + quạt + đèn cùng chạy | ___ V | |
+| Đèn: công suất ghi trên nhãn | ___ W | |
+| ΔE_LED (`lamp_self_lux`) = lux đèn bật − lux đèn tắt, phòng tối | ___ lux | |
 | Quạt dùng | Quạt 5 V / động cơ mini gắn cánh | |
 | Node 2: độ phân giải ổn định | SVGA / VGA | |
 | Node 2: có brownout không | Có / Không | |

@@ -4,7 +4,7 @@
 
 Hai node ESP32 đặt tại vườn ươm:
 
-- **Node 1 (điều khiển)** đo độ ẩm đất, nhiệt độ, độ ẩm không khí, ánh sáng, mực nước bể. Tự tưới và thông gió theo ngưỡng, có khóa an toàn ngay trên thiết bị.
+- **Node 1 (điều khiển)** đo độ ẩm đất, nhiệt độ, độ ẩm không khí, ánh sáng, mực nước bể. Tự tưới, thông gió và chiếu sáng bổ sung theo ngưỡng, có khóa an toàn ngay trên thiết bị.
 - **Node 2 (ESP32-CAM)** chụp ảnh khay cây để AI phân loại tình trạng lá.
 
 Dữ liệu và lệnh đi qua MQTT. Ảnh gửi qua HTTP. Backend tự xây quản lý người dùng (3 vai trò), vòng đời thiết bị (8 trạng thái), dữ liệu đo, lệnh, cấu hình, cảnh báo (Telegram) và chẩn đoán ảnh. Toàn bộ phía server chạy trực tiếp trên **một máy Windows**, gói trong thư mục repo; máy đó phát WiFi cho các node. Docker Compose để sau demo.
@@ -46,8 +46,8 @@ Chi tiết: [`docs/dac-ta-he-thong.md`](docs/dac-ta-he-thong.md).
 | Sketch chẩn đoán phần cứng (`firmware/test-hardware`) | ✅ |
 | Schema và seed CSDL | ✅ |
 | Triển khai trên Windows (script, PostgreSQL, Mosquitto) | ⬜ giai đoạn N0 |
-| Firmware Node 1 | 🟨 đã viết v1.0.0, chưa thử trên mạch |
-| Firmware Node 2 | ⬜ |
+| Firmware Node 1 | ✅ đã viết `v1.1.0`, chưa thử trên mạch |
+| Firmware Node 2 | ✅ đã viết `v1.0.0`, chưa thử trên mạch |
 | Backend API (FastAPI) | ⬜ |
 | AI service | ⬜ |
 | Frontend | ⬜ |
@@ -83,10 +83,10 @@ Chi tiết: [`deployment/README.md`](deployment/README.md) và đặc tả §17.
 
 | Thành viên | MSSV | GitHub | Phụ trách |
 |---|---|---|---|
-| [TV1] | | | Phần cứng, firmware |
-| [TV2] | | | Backend, CSDL |
-| [TV3] | | | Frontend, kiểm thử |
-| [TV4] | | | Bảo mật, DevOps, AI |
+| Hà Mạnh Quân | | | Phần cứng, firmware |
+| Lê Trung Kiên | | | Backend, CSDL |
+| Nguyễn Văn Đức Anh | | | Frontend, kiểm thử |
+| Cao Công Hoè | | | Bảo mật, DevOps, AI |
 
 ## Bảo mật
 
@@ -95,3 +95,4 @@ Không commit `.env`, `secrets.h`, khóa, chứng chỉ, ảnh có người, hay
 ## Thư viện và tài nguyên bên thứ ba
 
 Liệt kê ở `firmware/LIBRARIES.md`, `backend/ai-service/README.md` (dataset, mô hình) và báo cáo, theo yêu cầu công khai nguồn của đề bài.
+

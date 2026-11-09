@@ -5,8 +5,8 @@ Công cụ: **Arduino IDE 2** + core **esp32 by Espressif Systems** 3.x. Cách c
 | Thư mục | Board | Trạng thái | Nội dung |
 |---|---|---|---|
 | `test-hardware/` | NodeMCU-32S | ✅ | Sketch chẩn đoán: test từng linh kiện qua Serial Monitor (lệnh `h` để xem menu) |
-| `node1-controller/` | NodeMCU-32S | ✅ v1.0.0 (chưa thử trên mạch) | Firmware chính Node 1 (đặc tả §6) |
-| `node2-camera/` | AI Thinker ESP32-CAM | ⬜ | Firmware chính Node 2 (đặc tả §7) |
+| `node1-controller/` | NodeMCU-32S | ✅ v1.1.0 (chưa thử trên mạch) | Firmware chính Node 1 (đặc tả §6, §6.11) |
+| `node2-camera/` | AI Thinker ESP32-CAM | ✅ v1.0.0 (chưa thử trên mạch) | Firmware chính Node 2 (đặc tả §7) |
 
 ## Quy ước
 

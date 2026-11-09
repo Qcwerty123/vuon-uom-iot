@@ -18,6 +18,14 @@ struct Config {
   bool manualIgnoresCooldown;
   SoilCal s1, s2;
   float tankEmptyCm, tankFullCm;
+  // Chiếu sáng bổ sung (§6.11)
+  uint8_t lampStartHour, lampEndHour;   // khung [start, end), giờ Việt Nam
+  uint16_t lampLuxLow;                  // ngưỡng bật
+  uint16_t lampHyst;                    // ngưỡng tắt = lampLuxLow + lampHyst
+  uint16_t lampSelfLux;                 // ΔE_LED đo khi hiệu chuẩn
+  uint16_t lampHoldS;                   // debounce
+  uint16_t lampMinOnS, lampMinOffS;     // thời gian giữ tối thiểu
+  uint16_t lampOverrideMin;             // lệnh tay khi AUTO giữ tối đa bao lâu
 };
 
 extern Config cfg;

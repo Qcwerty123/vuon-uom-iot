@@ -8,7 +8,7 @@ struct TelemetryRec {
   uint32_t ms;        // millis() lúc đo — dùng để suy ra ts nếu lúc đo chưa có giờ
   bool synced;
   Readings r;
-  bool pump, fan;
+  bool pump, fan, lamp;
   uint8_t mode;       // 0 AUTO, 1 MANUAL, 2 LOCAL
   uint8_t locks;      // LockBits
 };
