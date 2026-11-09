@@ -10,4 +10,4 @@ mosquitto_pub -h <IP> -p 1883 -u ctl-0001 -P '<secret>' \
   -t nursery/g01/cam-0001/telemetry -m '{"v":1,"device_id":"cam-0001"}' -d
 ```
 
-Đối chiếu log broker (`docker compose logs mosquitto`) và CSDL (không có bản ghi mới) làm bằng chứng.
+Đối chiếu log broker (`logs/services/mosquitto.log`) và CSDL (không có bản ghi mới) làm bằng chứng.

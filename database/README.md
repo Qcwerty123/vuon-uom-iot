@@ -10,15 +10,11 @@ PostgreSQL 16. Đặc tả: `docs/dac-ta-he-thong.md` §11.
 
 ## Cách nạp
 
-Docker Compose gắn `init/` vào `/docker-entrypoint-initdb.d`. PostgreSQL **chỉ chạy các file này ở lần khởi tạo đầu tiên**, khi volume dữ liệu còn trống.
+Chạy trên Windows (đặc tả §17): `scripts/windows/setup.ps1` khởi tạo cụm PostgreSQL ở `runtime/pgdata`, tạo CSDL rồi chạy lần lượt các file trong `init/`. Chỉ chạy **một lần** khi CSDL còn trống.
 
-Muốn chạy lại từ đầu (xóa sạch dữ liệu):
+Muốn chạy lại từ đầu (xóa sạch dữ liệu): `scripts/windows/reset-db.ps1`. Sau khi reset, thiết bị vẫn giữ `config_version` cũ trong NVS: backend phải đánh số phiên bản cấu hình tiếp theo lớn hơn số thiết bị báo (đặc tả §9.3).
 
-```bash
-cd deployment
-docker compose down -v      # -v xóa luôn volume dbdata
-docker compose up -d db
-```
+(Bản Docker Compose để sau: thư mục `init/` được gắn vào `/docker-entrypoint-initdb.d`.)
 
 ## Tài khoản người dùng
 

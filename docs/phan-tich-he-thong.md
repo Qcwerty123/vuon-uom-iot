@@ -1,5 +1,7 @@
 # Phân tích hệ thống — Hệ thống chăm sóc vườn ươm thông minh
 
+> **Tài liệu lịch sử (v0.1, 31/10).** Các điểm ⚠ ở đây đã được chốt trong `dac-ta-he-thong.md` §22, nhiều chỗ đã thay đổi (2 cảm biến đất, không TimescaleDB, không Docker từ 05/11...). Khi hai tài liệu khác nhau, **đặc tả là nguồn đúng**. Giữ file này để làm báo cáo phần phân tích.
+
 > Đồ án kết thúc học phần **IoT và ứng dụng** · Bản phân tích v0.1 · 31/10/2026
 >
 > Đầu vào: (1) đề bài đồ án, (2) bộ slide thuyết trình 14 trang của nhóm, (3) danh sách linh kiện hiện có, (4) các quyết định đã chốt khi thảo luận.

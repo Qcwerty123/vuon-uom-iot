@@ -43,3 +43,12 @@ venv/
 *.iml
 .DS_Store
 Thumbs.db
+
+# ---------- Chạy trên Windows: mọi thứ nằm trong repo nhưng KHÔNG commit (đặc tả C22) ----------
+/tools/
+/runtime/
+/logs/
+/DINH-HUONG.md
+**/.venv/
+frontend/node_modules/
+*.log

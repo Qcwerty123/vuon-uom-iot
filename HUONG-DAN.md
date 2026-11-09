@@ -1,6 +1,8 @@
 # Hướng dẫn sử dụng repo khởi đầu
 
-Gói này là **repo khởi đầu** của đồ án. Đã có: tài liệu thiết kế, sketch chẩn đoán phần cứng, schema CSDL, Docker Compose cho broker và CSDL, các file cấu hình mẫu. Chưa có: firmware chính, backend, frontend, AI — mỗi thư mục đó có `README.md` ghi rõ cần làm gì.
+Gói này là **repo khởi đầu** của đồ án. Đã có: tài liệu thiết kế, sketch chẩn đoán phần cứng, firmware Node 1 (chưa thử trên mạch), schema CSDL, các file cấu hình mẫu. Chưa có: firmware Node 2, backend, frontend, AI, script triển khai Windows — mỗi thư mục có `README.md` ghi rõ cần làm gì.
+
+> **Từ 05/11:** hệ thống chạy trực tiếp trên một máy Windows, không Docker, mọi thứ gói trong thư mục repo; demo khoảng 18/11 (đặc tả v1.3, C21–C23).
 
 ---
 
@@ -68,16 +70,17 @@ cp .env.example .env          # sửa giá trị trong .env, không commit file 
 
    Rồi vào GitHub → **Releases → Draft a new release** → chọn tag `v1.0.0`.
 
-## 4. Việc tiếp theo của từng người
+## 4. Việc tiếp theo (từ 05/11, 2–3 người)
 
-| Thành viên | Việc làm ngay | Tài liệu |
+Lộ trình theo ngày: đặc tả §21.2 (N0 → N5, demo khoảng 18/11).
+
+| Vai | Việc làm ngay | Tài liệu |
 |---|---|---|
-| **[TV1] Phần cứng, firmware** | Cài Arduino IDE 2 và thư viện, điền `firmware/LIBRARIES.md`. Lắp Node 1 theo từng công đoạn, dùng `firmware/test-hardware`. Ghi `hardware/nhat-ky-lap-dat.md`. Thử Node 2 bằng ví dụ CameraWebServer | `docs/huong-dan-lap-dat-phan-cung.md` |
-| **[TV2] Backend, CSDL** | Chốt ngôn ngữ backend (C1). Dựng `backend/api` theo các mô-đun đặc tả. Bắt đầu từ: auth, users, devices, ingest MQTT | `docs/dac-ta-he-thong.md` §9–§13, `backend/README.md` |
-| **[TV3] Frontend, kiểm thử** | Dựng `frontend` (đăng nhập, dashboard). Viết thiết bị mô phỏng ở `tests/load` để backend có dữ liệu khi chưa có phần cứng | §10, §16, §18.3, §19 |
-| **[TV4] Bảo mật, DevOps, AI** | Chạy `db` + `mosquitto` bằng Docker Compose, khởi tạo Dynamic Security. Tải dataset, bắt đầu notebook huấn luyện ở `backend/ai-service` | `deployment/README.md`, §8.8, §14, §15 |
+| **Phần cứng, firmware** | Lắp Node 1 theo từng công đoạn, nghiệm thu bằng `firmware/test-hardware`, ghi `hardware/nhat-ky-lap-dat.md`, điền `firmware/LIBRARIES.md`. Nạp `node1-controller` khi broker đã chạy. Sau đó viết firmware Node 2 | `docs/huong-dan-lap-dat-phan-cung.md`, đặc tả §6, §7 |
+| **Backend, triển khai** | Giai đoạn N0: công cụ portable trong `tools/`, script `scripts/windows/`, CSDL + seed, broker + kiểm chứng dynsec, hotspot + tường lửa. Sau đó backend theo thứ tự `backend/README.md` | đặc tả §17, §9–§13 |
+| **Frontend, kiểm thử, AI** | Thiết bị mô phỏng ở `tests/load` (để có dữ liệu sớm), web đăng nhập + dashboard. Song song: tải dataset, huấn luyện giai đoạn 1–2 trên Google Colab | đặc tả §10, §16, §18.3, §15 |
 
-Các quyết định thiết kế đã chốt ngày 04/11 (`docs/dac-ta-he-thong.md` §22). Còn mở: C8 (ánh xạ nhãn AI).
+Các quyết định đã chốt: đặc tả §22. Còn mở: C8 (ánh xạ nhãn AI).
 
 ## 5. Bí mật và cấu hình
 
@@ -87,7 +90,8 @@ Các quyết định thiết kế đã chốt ngày 04/11 (`docs/dac-ta-he-thong
 | `.env` | ❌ | Giá trị thật, mỗi máy một bản |
 | `firmware/*/secrets.example.h` | ✅ | Mẫu |
 | `firmware/*/secrets.h` | ❌ | WiFi, mật khẩu thiết bị thật |
-| `deployment/mosquitto/data/` | ❌ | Chứa tài khoản broker |
+| `deployment/mosquitto/data/` | ❌ | Chứa tài khoản broker (bản Docker) |
+| `tools/`, `runtime/`, `logs/` | ❌ | Công cụ portable, dữ liệu chạy (CSDL, broker, ảnh, sao lưu), log |
 
 Nếu lỡ commit bí mật: **đổi ngay mật khẩu đó** (WiFi, secret thiết bị, JWT secret, bot token). Xóa file khỏi commit sau là chưa đủ, vì lịch sử Git vẫn giữ.
 

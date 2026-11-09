@@ -1,4 +1,6 @@
-# Nginx (chưa cấu hình)
+# Nginx (để sau demo)
+
+> Từ 05/11 bản demo không dùng Nginx: backend FastAPI phục vụ trực tiếp ở cổng 8000 (đặc tả §17, C15, C21). Nội dung dưới đây giữ cho bản Docker sau này.
 
 Nginx nằm trong image `web` (thư mục `frontend/`), làm 3 việc:
 
