@@ -9,7 +9,8 @@ Mỗi file `WP-xx-*.md` là một gói việc tự đủ để một agent hoặ
 | WP-02 | Backend lõi FastAPI (`backend/api`): auth, thiết bị + cấp phát dynsec, ingest, WebSocket | **Xong 06/11** — `test-backend.ps1` đạt 24/24 |
 | WP-03 | Backend nghiệp vụ: lệnh, cấu hình, offline, cảnh báo + Telegram, người dùng, audit | **Xong 06/11** — `test-backend.ps1 -Wp 03` đạt 35/35 |
 | WP-04 | Frontend React (`frontend/`) | **Đợt 1 xong 06/11** (đủ 11 màn, chạy thử bằng dữ liệu giả) — `WP-04-report.md` |
-| WP-N1 | Nối Node 1, Node 2 thật vào hệ thống qua backend | 07/11 — `WP-N1-noi-thiet-bi.md` |
+| WP-N1 | Nối Node 1, Node 2 thật vào hệ thống qua backend | Node 1 **đã nối 07/11**: ACTIVE, telemetry, lệnh bơm EXECUTED (ack 0,2 s). Còn: thử mất nguồn, hiệu chuẩn đất/bể, BH1750 báo lỗi. Node 2 chưa |
+| WP-07 | Ảnh + AI chẩn đoán lá: upload `/device-api/v1/images`, AI service 8001, DiagnosisWorker, AI_LEAF + Telegram ảnh, API chẩn đoán, gardens/zones | **Giao 09/11** — `WP-07-anh-ai.md`, hạn 14/11 |
 
 Danh sách đầy đủ các gói: `DINH-HUONG.md` mục 7 (bản riêng của nhóm, không commit).
 
