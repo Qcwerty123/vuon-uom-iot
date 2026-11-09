@@ -182,6 +182,12 @@ WP-07 đã kiểm:
 | `crop_box` | Đo trên ảnh thật sau khi cố định camera (§7.5), ví dụ `[40, 20, 780, 590]`. Đặt qua `PUT /devices/{id}/config {"params":{"crop_box":[...]}}` |
 | `active_tiles` | Liệt kê các ô có cây, ví dụ `[[0,0],[0,1],...]`. Đặt cùng cách |
 
+**Phát sinh sau khi đồng bộ `origin/dev` (10/11):**
+
+- Đặc tả §6.11 thêm cột `diagnoses.lamp_on`: backend ghi trạng thái đèn Node 1 cùng vườn lúc chụp. Cột đã có trong `01_schema.sql`, nhưng **WP-07 chưa ghi cột này**. CSDL dựng trước đó cũng chưa có cột, nên cần `ALTER TABLE diagnoses ADD COLUMN lamp_on BOOLEAN` hoặc `reset-db.ps1`.
+- Firmware Node 2 (`config_store.cpp`) bỏ qua khóa lạ, nên `crop_box` / `active_tiles` dùng được.
+- Miền giá trị lệch nhau: firmware nhận `jpeg_quality` 8–30 và có `frame_size`, `warmup_frames`; `validate_config` ở backend nhận `jpeg_quality` 10–63 và chưa nhận `frame_size`, `warmup_frames`.
+
 Thử với Node 2 thật:
 
 1. Admin cấp phát `cam-0001` trên web và nạp secret vào `secrets.h`.
