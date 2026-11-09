@@ -16,7 +16,8 @@ from ..audit import audit
 from ..db import get_db
 from ..deps import client_ip, current_user, permission_of, require_admin
 from ..errors import ApiError, not_found
-from ..models import Alert, AuditLog, Device, DeviceAssignment, RefreshToken, User
+from ..models import Alert, AuditLog, Device, DeviceAssignment, Diagnosis, RefreshToken, User
+from .diagnoses import diagnosis_out
 from ..schemas import Api, UserOut
 from ..security import hash_password, utcnow
 
@@ -171,10 +172,18 @@ def summary(user: User = Depends(current_user), db: Session = Depends(get_db)):
                           .where(Alert.device_id.in_(ids), Alert.status.in_(("OPEN", "ACKNOWLEDGED")))
                           .order_by(Alert.opened_at.desc()).limit(20)).all()
         open_alerts = [engine.alert_out(a, c) for a, c in rows]
+    latest_diag = {}   # §10.10: ảnh/chẩn đoán mới nhất của mỗi camera
+    cams = [d.id for d in devices if d.type == "CAMERA"]
+    if cams:
+        rows = db.scalars(select(Diagnosis).distinct(Diagnosis.device_id).where(Diagnosis.device_id.in_(cams))
+                          .order_by(Diagnosis.device_id, Diagnosis.captured_at.desc(), Diagnosis.id.desc()))
+        latest_diag = {x.device_id: diagnosis_out(x) for x in rows}
     return {
         "devices": [{"id": d.id, "deviceCode": d.device_code, "name": d.name, "type": d.type, "status": d.status,
                      "online": d.online, "lastSeenAt": d.last_seen_at, "permission": permission_of(db, user, d.id),
-                     "state": ingest.latest_state.get(d.id)} for d in devices],
+                     "state": ingest.latest_state.get(d.id), "latestDiagnosis": latest_diag.get(d.id)}
+                    for d in devices],
+        "latestDiagnoses": list(latest_diag.values()),
         "countByStatus": by_status,
         "onlineCount": sum(1 for d in devices if d.online),
         "openAlerts": open_alerts,

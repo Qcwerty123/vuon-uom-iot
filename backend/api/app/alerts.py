@@ -1,4 +1,4 @@
-"""Rule engine cảnh báo (đặc tả §13): THRESHOLD, OFFLINE, EVENT (AI_LEAF do WP-07 gọi open_alert)."""
+"""Rule engine cảnh báo (đặc tả §13): THRESHOLD, OFFLINE, EVENT. AI_LEAF nằm ở diagnosis.py (gọi open_alert)."""
 from __future__ import annotations
 
 import logging
@@ -55,7 +55,11 @@ def _place(db: Session, dev: Device) -> str:
     return f"Vườn {g.code if g else '?'} · {z.name if z else '?'}"
 
 
-def open_alert(db: Session, dev: Device, rule: AlertRule, message: str, context: dict) -> Alert | None:
+def open_alert(db: Session, dev: Device, rule: AlertRule, message: str, context: dict, *,
+               defer: bool = False) -> Alert | None:
+    """Mở cảnh báo nếu không có cảnh báo đang mở và đã hết cooldown.
+
+    defer=True: chưa đẩy WS / Telegram — người gọi commit rồi gọi announce() (luật "ghi trước, phát sau"; AI_LEAF)."""
     active = db.scalar(select(Alert).where(Alert.rule_id == rule.id, Alert.device_id == dev.id,
                                            Alert.status.in_(ACTIVE)).limit(1))
     if active:
@@ -69,15 +73,21 @@ def open_alert(db: Session, dev: Device, rule: AlertRule, message: str, context:
               context=context, status="OPEN", opened_at=_utc())
     db.add(a)
     db.flush()
-    realtime.publish(dev.id, {"type": "alert", "id": a.id, "deviceId": dev.id, "alertType": a.type,
-                              "severity": a.severity, "status": a.status, "message": a.message})
-    if rule.notify_telegram and dev.status != "MAINTENANCE" and telegram.enabled():
-        threading.Thread(target=_notify, args=(a.id,), daemon=True).start()
     log.info("Mở cảnh báo #%s: %s", a.id, a.message)
+    if not defer:
+        announce(a, dev, rule)
     return a
 
 
-def _notify(alert_id: int) -> None:
+def announce(a: Alert, dev: Device, rule: AlertRule, photo=None) -> None:
+    """Đẩy WS + gửi Telegram (photo: đường dẫn ảnh gửi kèm, §13.3 AI_LEAF)."""
+    realtime.publish(dev.id, {"type": "alert", "id": a.id, "deviceId": dev.id, "alertType": a.type,
+                              "severity": a.severity, "status": a.status, "message": a.message})
+    if rule.notify_telegram and dev.status != "MAINTENANCE" and telegram.enabled():
+        threading.Thread(target=_notify, args=(a.id, photo), daemon=True).start()
+
+
+def _notify(alert_id: int, photo=None) -> None:
     time.sleep(0.5)  # chờ giao dịch mở cảnh báo commit
     with session_scope() as db:
         a = db.get(Alert, alert_id)
@@ -90,7 +100,9 @@ def _notify(alert_id: int) -> None:
         icon = "🔴" if a.severity == "CRITICAL" else ("⚠" if a.severity == "WARNING" else "ℹ")
         sent = False
         for u in db.scalars(q):
-            sent = telegram.send(u.telegram_chat_id, f"{icon} {a.message}") or sent
+            text = f"{icon} {a.message}"
+            ok = bool(photo) and telegram.send_photo(u.telegram_chat_id, photo, text)
+            sent = (ok or telegram.send(u.telegram_chat_id, text)) or sent
         if sent:
             a.notified_at = _utc()
 

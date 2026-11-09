@@ -86,14 +86,32 @@ $statusRows += [PSCustomObject]@{
     "Chi tiết" = if ($backendListening) { "Đang lắng nghe" } else { "Chưa chạy hoặc chưa có code" }
 }
 
-# 4. AI Service
+# 4. AI Service (gọi /v1/health)
 $aiPort = 8001
 $aiListening = Test-PortListening $aiPort "127.0.0.1"
+$aiStatus = "DỪNG"
+$aiDetail = "Chưa chạy (start.ps1, hoặc start.ps1 -NoAi đã bỏ qua)"
+if ($aiListening) {
+    try {
+        $h = Invoke-RestMethod -Uri "http://127.0.0.1:$aiPort/v1/health" -TimeoutSec 5
+        if ($h.status -eq "ok") {
+            $aiStatus = if ($h.mode -eq "stub") { "CẢNH BÁO" } else { "OK" }
+            $aiDetail = "model_version=$($h.model_version), mode=$($h.mode)"
+            if ($h.mode -eq "stub") { $aiDetail += " (stub, KHÔNG phải mô hình thật)" }
+        } else {
+            $aiStatus = "CẢNH BÁO"
+            $aiDetail = "$($h.status): $($h.reason)"
+        }
+    } catch {
+        $aiStatus = "LỖI"
+        $aiDetail = "Cổng mở nhưng /v1/health lỗi: $($_.Exception.Message)"
+    }
+}
 $statusRows += [PSCustomObject]@{
     "Thành phần" = "AI Service"
     "Cổng/Địa chỉ" = "127.0.0.1:$aiPort"
-    "Trạng thái" = if ($aiListening) { "OK" } else { "CHƯA CÓ" }
-    "Chi tiết" = if ($aiListening) { "Đang lắng nghe" } else { "Chưa chạy hoặc chưa có code" }
+    "Trạng thái" = $aiStatus
+    "Chi tiết" = $aiDetail
 }
 
 # 5. Mobile Hotspot IP

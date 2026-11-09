@@ -3,7 +3,8 @@
 # Tương thích Windows PowerShell 5.1
 
 [CmdletBinding()]
-param([switch]$OnlyBroker)   # -OnlyBroker: chỉ dừng Mosquitto
+param([switch]$OnlyBroker,   # -OnlyBroker: chỉ dừng Mosquitto
+      [switch]$OnlyAi)       # -OnlyAi: chỉ dừng AI service
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptDir "common.ps1")
@@ -14,18 +15,24 @@ Import-EnvFile | Out-Null
 $pidsDir = Get-RepoPath "runtime/pids"
 $pgDataDir = Get-RepoPath "runtime/pgdata"
 
-# 1. Backend & AI service
+# 1. Backend & AI service (cùng lệnh "uvicorn app.main:app"; AI service có "ai-service" trong --app-dir)
+$uvi = @(Get-ProcessByCommandLine "uvicorn app.main:app")
+if (-not $OnlyBroker -and -not $OnlyAi) {
+    foreach ($p in $uvi) {
+        if ($p -and $p.CommandLine -notlike "*ai-service*") { Write-Log "Dừng backend (PID $($p.ProcessId))..."; Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue }
+    }
+}
 if (-not $OnlyBroker) {
-$be = Get-ProcessByCommandLine "uvicorn app.main:app"
-foreach ($p in @($be)) {
-    if ($p) { Write-Log "Dừng backend (PID $($p.ProcessId))..."; Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue }
-}
-
-$aiPidFile = Join-Path $pidsDir "ai.pid"
-if (Test-Path $aiPidFile) {
-    Stop-ProcessByPidFile $aiPidFile "python"
-}
-
+    foreach ($p in $uvi) {
+        if ($p -and $p.CommandLine -like "*ai-service*") { Write-Log "Dừng AI service (PID $($p.ProcessId))..."; Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue }
+    }
+    $aiPidFile = Join-Path $pidsDir "ai.pid"
+    if (Test-Path $aiPidFile) { Stop-ProcessByPidFile $aiPidFile "python" | Out-Null }
+    if ($OnlyAi) {
+        for ($i = 0; $i -lt 20 -and (Test-PortListening 8001); $i++) { Start-Sleep -Milliseconds 250 }
+        Write-Log "AI service: Đã dừng." "SUCCESS"
+        exit 0
+    }
 }
 
 # 2. Mosquitto

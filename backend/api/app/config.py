@@ -60,6 +60,9 @@ class Settings:
     dynsec_file: Path
     seed_passwords: dict
     telegram_token: str
+    ai_url: str
+    ai_conf_alert: float
+    max_image_bytes: int
 
 
 def load() -> Settings:
@@ -88,6 +91,9 @@ def load() -> Settings:
             "viewer": get("SEED_VIEWER_PASSWORD"),
         },
         telegram_token=get("TELEGRAM_BOT_TOKEN"),
+        ai_url=get("AI_URL", "http://127.0.0.1:8001").rstrip("/"),
+        ai_conf_alert=float(get("AI_CONF_ALERT", "0.8")),
+        max_image_bytes=300 * 1024,  # §8.9: JPEG ≤ 300 KB
     )
 
 

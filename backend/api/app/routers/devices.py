@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import dynsec
+from .. import device_auth, dynsec
 from ..audit import audit
 from ..config import settings
 from ..db import get_db
@@ -130,6 +130,7 @@ def rotate_secret(device_id: int, request: Request, admin: User = Depends(requir
     secret = new_device_secret()
     _broker_call(dynsec.set_password, dev.device_code, secret)
     dev.credential_hash = hash_password(secret)
+    device_auth.invalidate(dev.device_code)
     audit(db, "DEVICE_SECRET_ROTATED", actor=admin, target_type="device", target_id=dev.id, ip=client_ip(request))
     db.commit()
     garden = _garden_code(db, dev)

@@ -182,6 +182,18 @@ def validate_config(params: dict, base: dict) -> dict:
             if v not in ("on", "off", "auto"):
                 bad(k, "flash phải là on/off/auto")
             out[k] = v
+        elif k == "crop_box":  # camera: vùng khay [x0, y0, x1, y1] (pixel, hoặc tỉ lệ 0..1) — §15.4
+            if v is not None and not (isinstance(v, list) and len(v) == 4
+                                      and all(isinstance(t, (int, float)) and not isinstance(t, bool) and t >= 0
+                                              for t in v) and v[2] > v[0] and v[3] > v[1]):
+                bad(k, "crop_box phải là [x0, y0, x1, y1] với x1 > x0, y1 > y0")
+            out[k] = v
+        elif k == "active_tiles":  # camera: các ô có cây [[r, c], ...] — §15.6
+            if v is not None and not (isinstance(v, list) and all(
+                    isinstance(t, list) and len(t) == 2 and all(isinstance(x, int) and 0 <= x <= 2 for x in t)
+                    for t in v)):
+                bad(k, "active_tiles phải là [[r, c], ...] với r, c trong 0..2")
+            out[k] = v
         else:
             bad(k, f"Khóa cấu hình '{k}' không được hỗ trợ")
     if out.get("soil_low", 0) >= out.get("soil_high", 100):
@@ -272,6 +284,11 @@ def on_ack(db: Session, dev: Device, b: dict) -> None:
         cmd.detail = {**(cmd.detail or {}), "late_ack": result}
         return
     cmd.status = RESULT_STATUS.get(result, "REJECTED" if result in REJECT_RESULTS else "FAILED")
+    if cmd.action == "capture" and result == "executed":
+        # §7.4: ack executed {image_id:"img-<id>"} → lưu cả diagnosis_id dạng số để web mở thẳng bản ghi
+        img = str(detail.get("image_id") or "")
+        if img.startswith("img-") and img[4:].isdigit():
+            detail = {**detail, "diagnosis_id": int(img[4:])}
     cmd.result, cmd.detail, cmd.ack_at = result[:40], detail, _utc()
     _push_cmd(cmd)
 

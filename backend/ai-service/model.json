@@ -1,0 +1,30 @@
+{
+  "_ghi_chu": "Mô tả trọng số mô hình (đặc tả §15.5, C24). scripts/windows/get-model.ps1 đọc file này để tải và kiểm SHA256. Trọng số KHÔNG commit, nằm ở runtime/ai/models/.",
+  "model_version": "mnv2-pv38-hassan-v1",
+  "name": "Plant Disease Detector — MobileNetV2 fine-tuned (PlantVillage, 38 lớp)",
+  "author": "S.M Hassan (Muhammad-Hassan12)",
+  "source": "https://huggingface.co/rarfileexe/Plant-Disease-Detector",
+  "code": "https://github.com/Muhammad-Hassan12/Plant-Disease-Detector",
+  "license": "MIT",
+  "framework": "Keras 3.10 (TensorFlow backend)",
+  "file": "plant-disease-mnv2-pv38.keras",
+  "url": "https://huggingface.co/rarfileexe/Plant-Disease-Detector/resolve/main/model_4_mobilenet_finetuned.keras",
+  "sha256": "08f285aff6d9e1ab88d4d5b2269f1cc977714003755f8553887edbf8691b325f",
+  "size_bytes": 25143175,
+  "input": {"size": [224, 224], "range": "RGB 0..255 (mô hình tự chuẩn hóa về [-1, 1] bên trong)"},
+  "classes": [
+    "Apple___Apple_scab", "Apple___Black_rot", "Apple___Cedar_apple_rust", "Apple___Healthy",
+    "Blueberry___Healthy", "Cherry_(including_sour)___Powdery_mildew", "Cherry_(including_sour)___Healthy",
+    "Corn_(maize)___Cercospora_leaf_spot Gray_leaf_spot", "Corn_(maize)___Common_rust_",
+    "Corn_(maize)___Northern_Leaf_Blight", "Corn_(maize)___Healthy", "Grape___Black_rot",
+    "Grape___Esca_(Black_Measles)", "Grape___Leaf_blight_(Isariopsis_Leaf_Spot)", "Grape___Healthy",
+    "Orange___Haunglongbing_(Citrus_greening)", "Peach___Bacterial_spot", "Peach___Healthy",
+    "Pepper,_bell___Bacterial_spot", "Pepper,_bell___Healthy", "Potato___Early_blight",
+    "Potato___Late_blight", "Potato___Healthy", "Raspberry___Healthy", "Soybean___Healthy",
+    "Squash___Powdery_mildew", "Strawberry___Leaf_scorch", "Strawberry___Healthy",
+    "Tomato___Bacterial_spot", "Tomato___Early_blight", "Tomato___Late_blight", "Tomato___Leaf_Mold",
+    "Tomato___Septoria_leaf_spot", "Tomato___Spider_mites Two-spotted_spider_mite",
+    "Tomato___Target_Spot", "Tomato___Tomato_Yellow_Leaf_Curl_Virus", "Tomato___Tomato_mosaic_virus",
+    "Tomato___Healthy"
+  ]
+}

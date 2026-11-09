@@ -68,6 +68,9 @@ def _mark_seen(db, dev: Device, retained: bool = False) -> None:
         transition(db, dev, "ACTIVE", "Có tín hiệu lại", strict=False)
 
 
+mark_seen = _mark_seen   # dùng chung cho upload ảnh HTTP (§8.9)
+
+
 def handle(topic: str, payload: bytes, retained: bool = False) -> None:
     stats["received"] += 1
     parts = topic.split("/")
