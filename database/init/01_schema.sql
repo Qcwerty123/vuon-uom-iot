@@ -145,6 +145,7 @@ CREATE TABLE diagnoses (
   captured_at TIMESTAMPTZ NOT NULL,
   trigger VARCHAR(10) NOT NULL,            -- schedule / command
   cmd_id UUID,
+  lamp_on BOOLEAN,                         -- trạng thái đèn Node 1 lúc chụp (§6.11)
   status diag_status NOT NULL DEFAULT 'QUEUED',
   model_version VARCHAR(30),
   tiles JSONB,                             -- [{r,c,label,conf,probs:{...}}] × 9

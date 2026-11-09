@@ -19,7 +19,9 @@
 | HC-SR04 tại 20 cm thước | ___ cm | |
 | `TANK_EMPTY_CM` / `TANK_FULL_CM` | ___ / ___ | |
 | Lưu lượng bơm | ___ ml / 10 s | |
-| Điện áp +5 V khi bơm + quạt cùng chạy | ___ V | |
+| Điện áp +5 V khi bơm + quạt + đèn cùng chạy | ___ V | |
+| Đèn: công suất ghi trên nhãn | ___ W | |
+| ΔE_LED (`lamp_self_lux`) = lux đèn bật − lux đèn tắt, phòng tối | ___ lux | |
 | Quạt dùng | Quạt 5 V / động cơ mini gắn cánh | |
 | Node 2: độ phân giải ổn định | SVGA / VGA | |
 | Node 2: có brownout không | Có / Không | |

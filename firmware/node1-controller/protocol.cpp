@@ -99,6 +99,7 @@ static bool publishTelemetry(const TelemetryRec& rec, bool buffered) {
   JsonObject st = doc["state"].to<JsonObject>();
   st["pump"] = rec.pump ? 1 : 0;
   st["fan"] = rec.fan ? 1 : 0;
+  st["lamp"] = rec.lamp ? 1 : 0;
   st["mode"] = MODE_NAMES[rec.mode];
   locksToJson(rec.locks, st["locks"].to<JsonArray>());
   serializeJson(doc, out, sizeof out);
@@ -114,6 +115,7 @@ static void telemetryTick() {
   rec.r = sensorReadings();
   rec.pump = pumpIsOn();
   rec.fan = fanIsOn();
+  rec.lamp = lampIsOn();
   rec.mode = modeCode();
   rec.locks = currentLocks();
   // Còn bản cũ chưa gửi thì xếp hàng sau để giữ đúng thứ tự

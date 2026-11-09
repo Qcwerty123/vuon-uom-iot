@@ -31,4 +31,5 @@
 | 24 | Đồng hồ vạn năng cơ bản (DT-830) | 1 | | Đo kiểm khi lắp |
 | 25 | Bể nước, khay, đất, cây giống cà chua | — | | Mô hình |
 | 26 | Cánh quạt nhựa vừa trục động cơ mini + giá kẹp | 1 | | Chỉ khi chế quạt từ động cơ mini |
+| 27 | Đèn LED 5 V ánh trắng ≤ 5 W | 1 | | Chiếu sáng bổ sung — relay kênh 3 (§6.11) |
 | | **Tổng** | | | |

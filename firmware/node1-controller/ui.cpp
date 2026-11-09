@@ -46,6 +46,7 @@ static const char* resultText(const char* r) {
   if (strcmp(r, "blocked_no_water") == 0) return "Chan: be can";
   if (strcmp(r, "blocked_cooldown") == 0) return "Chan: dang nghi";
   if (strcmp(r, "blocked_sensor_fault") == 0) return "Chan: loi cam bien";
+  if (strcmp(r, "blocked_overheat") == 0) return "Chan: qua nong";
   return r;
 }
 
@@ -111,6 +112,7 @@ static void handleKey(char k) {
     case '1': localAction(pumpIsOn() ? "pump_off" : "pump_on"); break;
     case '2': localAction(fanIsOn() ? "fan_off" : "fan_on"); break;
     case '3': localAction("set_mode"); break;
+    case '4': localAction(lampIsOn() ? "lamp_off" : "lamp_on"); break;
     case '0':
       localExit();
       emitEvent("local_override", [](JsonObject d) { d["action"] = "exit"; });
@@ -162,16 +164,17 @@ static void drawSensors() {
 
 static void drawActuators() {
   char t[32];
-  snprintf(t, sizeof t, "Bom : %s", pumpIsOn() ? "BAT" : "tat");
+  snprintf(t, sizeof t, "Bom: %s  Quat: %s", pumpIsOn() ? "BAT" : "tat", fanIsOn() ? "BAT" : "tat");
   line(1, t);
-  snprintf(t, sizeof t, "Quat: %s", fanIsOn() ? "BAT" : "tat");
+  snprintf(t, sizeof t, "Den: %s (%02u-%02u)", lampIsOn() ? "BAT" : "tat", cfg.lampStartHour, cfg.lampEndHour);
   line(2, t);
   snprintf(t, sizeof t, "Che do: %s", modeIsAuto() ? "AUTO" : "MANUAL");
   line(3, t);
   uint8_t l = currentLocks();
-  snprintf(t, sizeof t, "Khoa:%s%s%s%s%s", l ? "" : " khong",
+  snprintf(t, sizeof t, "Khoa:%s%s%s%s%s%s", l ? "" : " khong",
            (l & LOCK_NO_WATER) ? " BE" : "", (l & LOCK_COOLDOWN) ? " NGHI" : "",
-           (l & LOCK_SOIL_FAULT) ? " DAT" : "", (l & LOCK_LOCAL) ? " TAY" : "");
+           (l & LOCK_SOIL_FAULT) ? " DAT" : "", (l & LOCK_LOCAL) ? " TAY" : "",
+           (l & LOCK_OVERHEAT) ? " NONG" : "");
   line(4, t);
 }
 
@@ -206,7 +209,7 @@ static void draw() {
     else drawNetwork();
   }
   if ((int32_t)(millis() - msgUntil) < 0) line(5, msg);
-  else if (localActive() && !pinEntry) line(5, "1Bom 2Quat 3Mode 0Ra");
+  else if (localActive() && !pinEntry) line(5, "1B 2Q 3Mode 4Den 0Ra");
   oled.sendBuffer();
 }
 

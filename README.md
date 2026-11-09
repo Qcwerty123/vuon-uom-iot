@@ -4,7 +4,7 @@
 
 Hai node ESP32 đặt tại vườn ươm:
 
-- **Node 1 (điều khiển)** đo độ ẩm đất, nhiệt độ, độ ẩm không khí, ánh sáng, mực nước bể. Tự tưới và thông gió theo ngưỡng, có khóa an toàn ngay trên thiết bị.
+- **Node 1 (điều khiển)** đo độ ẩm đất, nhiệt độ, độ ẩm không khí, ánh sáng, mực nước bể. Tự tưới, thông gió và chiếu sáng bổ sung theo ngưỡng, có khóa an toàn ngay trên thiết bị.
 - **Node 2 (ESP32-CAM)** chụp ảnh khay cây để AI phân loại tình trạng lá.
 
 Dữ liệu và lệnh đi qua MQTT. Ảnh gửi qua HTTP. Backend tự xây quản lý người dùng (3 vai trò), vòng đời thiết bị (8 trạng thái), dữ liệu đo, lệnh, cấu hình, cảnh báo (Telegram) và chẩn đoán ảnh. Toàn bộ phía server chạy bằng Docker Compose.
@@ -44,9 +44,9 @@ Chi tiết: [`docs/dac-ta-he-thong.md`](docs/dac-ta-he-thong.md).
 | Sketch chẩn đoán phần cứng (`firmware/test-hardware`) | ✅ |
 | Schema và seed CSDL | ✅ |
 | Docker Compose: PostgreSQL + Mosquitto | ✅ (backend, AI, web chờ có code) |
-| Firmware Node 1 | ⬜ |
-| Firmware Node 2 | ⬜ |
-| Backend API | ⬜ (chờ chốt ngôn ngữ — `docs/dac-ta-he-thong.md` §22, C1) |
+| Firmware Node 1 | ✅ (`v1.1.0` — chờ nạp thử trên mạch) |
+| Firmware Node 2 | ✅ (`v1.0.0` — chờ nạp thử trên mạch) |
+| Backend API | ⬜ (đã chốt FastAPI — `docs/dac-ta-he-thong.md` §22, C1) |
 | AI service | ⬜ |
 | Frontend | ⬜ |
 | Kiểm thử và số liệu | ⬜ |
@@ -75,10 +75,10 @@ Chi tiết: [`deployment/README.md`](deployment/README.md).
 
 | Thành viên | MSSV | GitHub | Phụ trách |
 |---|---|---|---|
-| [TV1] | | | Phần cứng, firmware |
-| [TV2] | | | Backend, CSDL |
-| [TV3] | | | Frontend, kiểm thử |
-| [TV4] | | | Bảo mật, DevOps, AI |
+| Hà Mạnh Quân | | | Phần cứng, firmware |
+| Lê Trung Kiên | | | Backend, CSDL |
+| Nguyễn Văn Đức Anh | | | Frontend, kiểm thử |
+| Cao Công Hoè | | | Bảo mật, DevOps, AI |
 
 ## Bảo mật
 

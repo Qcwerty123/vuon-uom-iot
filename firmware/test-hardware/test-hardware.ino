@@ -44,7 +44,7 @@ const int PIN_PROBE = 36;   // chân VP. Lệnh 'a': CHỈ đưa tín hiệu <= 
 
 const int   RELAY_COUNT = 3;
 const int   RELAY_PINS[RELAY_COUNT]  = {26, 27, 25};
-const char* RELAY_NAMES[RELAY_COUNT] = {"Relay 1 - Bom", "Relay 2 - Quat", "Relay 3 - Du phong"};
+const char* RELAY_NAMES[RELAY_COUNT] = {"Relay 1 - Bom", "Relay 2 - Quat", "Relay 3 - Den"};
 
 const byte KP_ROWS = 4;
 const byte KP_COLS = 3;
@@ -119,7 +119,7 @@ void printMenu() {
   Serial.println(" u  : do khoang cach HC-SR04                     [C7]");
   Serial.println(" 1  : bat relay 1 (bom) 3 giay                   [C8, C10]");
   Serial.println(" 2  : bat relay 2 (quat) 3 giay                  [C8, C9]");
-  Serial.println(" 3  : bat relay 3 (du phong) 3 giay              [C8]");
+  Serial.println(" 3  : bat relay 3 (den) 3 giay                   [C8, C9b]");
   Serial.println(" r  : dao logic kich relay H <-> L               [C8]");
   Serial.println(" a  : do dien ap chan VP/GPIO36 (<= 3,3 V)       [PL3]");
   Serial.printf ("Relay hien dang kich muc %s. OLED: %s\n",

@@ -2,12 +2,15 @@
 #pragma once
 #include <Arduino.h>
 
-#define FW_VERSION "1.0.0"
+#define FW_VERSION "1.1.0"   // 1.1.0: đèn chiếu sáng, lệch pha relay, khóa nhiệt
 #define HW_VERSION "node1-r1"
 
 // Jumper relay đặt ở H (kích mức cao) — hướng dẫn lắp đặt §C8.
 // Nếu đặt ở L thì đổi thành 0.
 #define RELAY_ACTIVE_HIGH 1
+
+// Giờ Việt Nam (UTC+7) — dùng cho khung giờ chiếu sáng (§6.11)
+#define TZ_OFFSET_H 7
 
 namespace pins {
 constexpr int SOIL1 = 34;        // ADC1, chỉ đầu vào
@@ -20,7 +23,7 @@ constexpr int US_TRIG = 5;
 constexpr int US_ECHO = 18;      // qua cầu chia 1k/2k
 constexpr int RELAY_PUMP = 26;   // IN1
 constexpr int RELAY_FAN = 27;    // IN2
-constexpr int RELAY_SPARE = 25;  // IN3 — để trống, luôn tắt
+constexpr int RELAY_LAMP = 25;   // IN3 — đèn LED 5 V (§6.11)
 constexpr uint8_t KP_ROWS[4] = {13, 14, 16, 17};
 constexpr uint8_t KP_COLS[3] = {19, 23, 33};
 }
@@ -50,6 +53,7 @@ enum LockBits : uint8_t {
   LOCK_COOLDOWN = 2,
   LOCK_SOIL_FAULT = 4,
   LOCK_LOCAL = 8,
+  LOCK_OVERHEAT = 16,
 };
 
 inline float clampf(float x, float lo, float hi) { return x < lo ? lo : (x > hi ? hi : x); }
