@@ -37,6 +37,7 @@ export const COMMAND_RESULT = {
   blocked_cooldown: 'đang nghỉ giữa hai lần tưới',
   blocked_sensor_fault: 'cảm biến lỗi',
   blocked_local: 'đang thao tác tại chỗ',
+  blocked_overheat: 'quá nóng, khóa đèn',
   invalid: 'lệnh không hợp lệ',
   expired: 'lệnh hết hạn',
   unsupported: 'thiết bị không hỗ trợ',
@@ -48,6 +49,8 @@ export const ACTION = {
   pump_off: 'Tắt bơm',
   fan_on: 'Bật quạt',
   fan_off: 'Tắt quạt',
+  lamp_on: 'Bật đèn',
+  lamp_off: 'Tắt đèn',
   set_mode: 'Đổi chế độ',
   reboot: 'Khởi động lại',
   request_status: 'Hỏi trạng thái',
@@ -93,6 +96,7 @@ export const LOCKS = {
   cooldown: 'đang nghỉ',
   soil_fault: 'cảm biến đất lỗi',
   local: 'đang khóa tại chỗ',
+  overheat: 'quá nóng (tắt đèn)',
 }
 
 export const EVENT = {
@@ -100,6 +104,8 @@ export const EVENT = {
   pump_off: 'Bơm tắt',
   fan_on: 'Quạt bật',
   fan_off: 'Quạt tắt',
+  lamp_on: 'Đèn bật',
+  lamp_off: 'Đèn tắt',
   tank_low: 'Bể sắp cạn',
   tank_ok: 'Bể đủ nước',
   sensor_fault: 'Cảm biến lỗi',
@@ -109,6 +115,16 @@ export const EVENT = {
   boot: 'Khởi động',
 }
 export const EVENT_SOURCE = { auto: 'tự động', remote: 'từ web', local: 'tại chỗ' }
+export const LAMP_REASON = {
+  low_light: 'thiếu sáng',
+  bright: 'đủ sáng',
+  window_end: 'ngoài khung giờ',
+  overheat: 'quá nóng',
+  sensor_fallback: 'cảm biến ánh sáng lỗi, bật theo lịch',
+  command: 'lệnh',
+  override_end: 'hết thời gian lệnh tay',
+  shutdown: 'khởi động lại',
+}
 
 export const LEAF = {
   HEALTHY: { text: 'Khỏe', color: 'rgba(47, 158, 68, 0.35)', tone: 'ok' },
@@ -176,6 +192,7 @@ export function eventText(type, detail) {
   const parts = []
   if (detail.source) parts.push(EVENT_SOURCE[detail.source] || detail.source)
   if (detail.duration_s) parts.push(`${detail.duration_s} giây`)
+  if (detail.reason && LAMP_REASON[detail.reason]) parts.push(LAMP_REASON[detail.reason])
   if (detail.sensor) parts.push(`cảm biến ${detail.sensor}`)
   if (detail.tank !== undefined) parts.push(`bể ${detail.tank}%`)
   if (detail.reset_reason) parts.push(`lý do: ${detail.reset_reason}`)

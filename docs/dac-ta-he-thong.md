@@ -6,6 +6,8 @@
 >
 > **Thay đổi v1.4 (07/11):** thêm chiếu sáng bổ sung bằng đèn LED 5 V trên relay kênh 3, dùng chung củ sạc 5V/3A (§6.11, C25): khung giờ + bù theo lux có trễ, debounce, thời gian giữ, BH1750 lỗi thì bật theo lịch, khóa nhiệt; mọi lần bật relay lệch nhau 400 ms. Các mục đổi: §1.2, §3.4, §5, §6.6, §6.8, §6.11, §8.3, §8.5, §8.6, §8.7, §11.2, §16, §19.1, §21.2, §22.
 >
+> **Bổ sung v1.4 (10/11, WP-08):** backend, web, Node 1 giả theo §6.11; lệnh tay đèn ở AUTO (cả `lamp_off`) giữ `lamp_override_min`, `set_mode AUTO` bỏ lệnh tay; `GET /events` lọc nhiều loại; miền cấu hình camera §7.2 khớp firmware Node 2; `diagnoses.lamp_on` trả ở API là `lampOn`.
+>
 > Tài liệu này gom toàn bộ phân tích và các quyết định đã chốt, rồi chi tiết hóa tới mức có thể bắt tay vào code: chân GPIO, firmware, MQTT, REST API, schema CSDL, máy trạng thái, bảo mật, AI, triển khai, kiểm thử và demo.
 >
 > **Ký hiệu**
@@ -678,7 +680,7 @@ Thiết bị từ chối cấu hình (`invalid`) nếu `lamp_end_hour ≤ lamp_s
 **Lệnh tay và chế độ**
 
 - Lệnh `lamp_on {duration_min?}` (1–`lamp_override_min`, mặc định `lamp_override_min`) và `lamp_off`.
-- **AUTO:** lệnh tay giữ hiệu lực tối đa `lamp_override_min`, sau đó trả về logic AUTO (`reason: override_end`). Bật tay ban đêm được phép để người vận hành kiểm tra cây, nhưng hết thời gian là tự tắt.
+- **AUTO:** lệnh tay giữ hiệu lực tối đa `lamp_override_min`, sau đó trả về logic AUTO (`reason: override_end`). Bật tay ban đêm được phép để người vận hành kiểm tra cây, nhưng hết thời gian là tự tắt. Lệnh `lamp_off` cũng giữ như vậy (đèn tắt trong `lamp_override_min` dù thiếu sáng). Lệnh `set_mode AUTO` bỏ mọi lệnh tay đèn/quạt đang giữ.
 - **MANUAL:** đèn chỉ chạy theo lệnh, không tự tắt theo lịch.
 - **LOCAL:** keypad phím `4` bật/tắt đèn.
 - Khóa nhiệt (dòng 3) áp dụng ở **mọi** chế độ: lệnh bật khi quá nóng bị từ chối với `blocked_overheat`.
@@ -734,11 +736,11 @@ Thiết bị từ chối cấu hình (`invalid`) nếu `lamp_end_hour ≤ lamp_s
 
 | Khóa | Mặc định | Ghi chú |
 |---|---|---|
-| `frame_size` | SVGA (800×600) | Đủ để cắt 3×3 ô. Có thể thử XGA nếu RAM cho phép |
-| `jpeg_quality` | 12 | 10–15. Số nhỏ là nét hơn và nặng hơn |
+| `frame_size` | SVGA (800×600) | `VGA` / `SVGA` / `XGA` / `HD` / `SXGA` / `UXGA`. Đủ để cắt 3×3 ô. Có thể thử XGA nếu RAM cho phép |
+| `jpeg_quality` | 12 | Miền 8–30 (firmware và backend cùng kiểm), nên dùng 10–15. Số nhỏ là nét hơn và nặng hơn |
 | `flash` | `auto` | `on` / `off` / `auto` (bật khi lux thấp — nhận lux từ Node 1 qua backend là ngoài phạm vi, nên `auto` = bật trong 19h–6h) |
 | `capture_interval_min` | 30 | Khi demo chuyển 1–2 phút |
-| `warmup_frames` | 2 | Bỏ 2 khung đầu sau khi bật flash để camera ổn định phơi sáng |
+| `warmup_frames` | 2 | 0–5. Bỏ 2 khung đầu sau khi bật flash để camera ổn định phơi sáng |
 
 ### 7.3. Bộ nhớ và nguồn
 
@@ -1076,7 +1078,7 @@ Không có đăng ký tự do: chỉ ADMIN tạo tài khoản (C7, §10.3).
 | GET | `/devices/{id}/telemetry?metric=soil,air_temp&from=&to=&interval=raw\|1h\|1d` | Chuỗi thời gian. Khoảng > 2 ngày tự dùng `1h` |
 | GET | `/devices/{id}/telemetry/stats?metric=&from=&to=` | min/max/avg/count |
 | GET | `/devices/{id}/telemetry/export.csv?from=&to=` | Xuất CSV, giới hạn 31 ngày |
-| GET | `/devices/{id}/events?type=&from=&to=` | Sự kiện thiết bị |
+| GET | `/devices/{id}/events?type=&from=&to=` | Sự kiện thiết bị. `type` nhận một hoặc nhiều loại cách nhau dấu phẩy (ví dụ `lamp_on,lamp_off` cho số giờ chiếu sáng, §6.11) |
 
 ### 10.7. Commands
 

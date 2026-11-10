@@ -235,6 +235,7 @@ class Diagnosis(Base):
     captured_at: Mapped[datetime] = mapped_column(TS)
     trigger: Mapped[str] = mapped_column(String(10))
     cmd_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False))
+    lamp_on: Mapped[bool | None] = mapped_column(Boolean)   # đèn Node 1 cùng vườn lúc chụp (§6.11)
     status: Mapped[str] = mapped_column(DiagStatus, default="QUEUED")
     model_version: Mapped[str | None] = mapped_column(String(30))
     tiles: Mapped[list | None] = mapped_column(JSONB)

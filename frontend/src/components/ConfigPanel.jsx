@@ -17,14 +17,33 @@ const CONTROLLER_FIELDS = [
   { k: 'hum_hyst', label: 'Độ trễ độ ẩm', unit: '%', min: 1, max: 20, step: 1 },
   { k: 'telemetry_interval_s', label: 'Chu kỳ gửi dữ liệu', unit: 'giây', min: 2, max: 300, int: true },
 ]
+// Chiếu sáng bổ sung Node 1 (đặc tả §6.11). Ô trống = thiết bị dùng mặc định (def).
+const LAMP_FIELDS = [
+  { k: 'lamp_start_hour', label: 'Bắt đầu khung chiếu sáng', unit: 'giờ', min: 0, max: 23, int: true, def: 6 },
+  { k: 'lamp_end_hour', label: 'Kết thúc khung chiếu sáng', unit: 'giờ', min: 1, max: 24, int: true, def: 20 },
+  { k: 'lamp_lux_low', label: 'Bật đèn khi ánh sáng dưới', unit: 'lux', min: 0, max: 65535, int: true, def: 800 },
+  { k: 'lamp_hyst', label: 'Độ trễ tắt (tắt khi ≥ ngưỡng bật + trễ)', unit: 'lux', min: 1, max: 65535, int: true, def: 700 },
+  { k: 'lamp_self_lux', label: 'Độ sáng do chính đèn tạo ra', unit: 'lux', min: 0, max: 5000, int: true, def: 300 },
+  { k: 'lamp_hold_s', label: 'Điều kiện phải giữ liên tục', unit: 'giây', min: 2, max: 600, int: true, def: 10 },
+  { k: 'lamp_min_on_s', label: 'Bật tối thiểu', unit: 'giây', min: 10, max: 3600, int: true, def: 30 },
+  { k: 'lamp_min_off_s', label: 'Tắt tối thiểu', unit: 'giây', min: 10, max: 3600, int: true, def: 30 },
+  { k: 'lamp_override_min', label: 'Lệnh tay giữ tối đa (chế độ AUTO)', unit: 'phút', min: 1, max: 240, int: true, def: 60 },
+]
 const CAMERA_FIELDS = [
   { k: 'capture_interval_min', label: 'Chu kỳ chụp ảnh', unit: 'phút', min: 1, max: 1440, int: true },
-  { k: 'jpeg_quality', label: 'Chất lượng JPEG (số nhỏ = nét hơn)', unit: '', min: 10, max: 63, int: true },
+  { k: 'jpeg_quality', label: 'Chất lượng JPEG (số nhỏ = nét hơn)', unit: '', min: 8, max: 30, int: true },
+  { k: 'warmup_frames', label: 'Số khung bỏ trước khi chụp', unit: '', min: 0, max: 5, int: true },
 ]
+const FRAME_SIZES = ['VGA', 'SVGA', 'XGA', 'HD', 'SXGA', 'UXGA'] // khớp firmware Node 2
+const ctrlFields = () => [...CONTROLLER_FIELDS, ...LAMP_FIELDS]
+const lampVal = (v, k) => {
+  const f = LAMP_FIELDS.find((x) => x.k === k)
+  return v[k] === '' || v[k] === undefined ? f.def : Number(v[k])
+}
 
 function validate(type, v) {
   const errs = {}
-  const fields = type === 'CAMERA' ? CAMERA_FIELDS : CONTROLLER_FIELDS
+  const fields = type === 'CAMERA' ? CAMERA_FIELDS : ctrlFields()
   fields.forEach((f) => {
     const raw = v[f.k]
     if (raw === '' || raw === undefined || raw === null) return
@@ -36,6 +55,12 @@ function validate(type, v) {
   if (type !== 'CAMERA') {
     if (v.soil_low !== '' && v.soil_high !== '' && Number(v.soil_low) >= Number(v.soil_high)) {
       errs.soil_low = 'Phải nhỏ hơn ngưỡng ngừng tưới'
+    }
+    if (!errs.lamp_end_hour && lampVal(v, 'lamp_end_hour') <= lampVal(v, 'lamp_start_hour')) {
+      errs.lamp_end_hour = 'Phải lớn hơn giờ bắt đầu'
+    }
+    if (!errs.lamp_hyst && lampVal(v, 'lamp_hyst') <= lampVal(v, 'lamp_self_lux') + 200) {
+      errs.lamp_hyst = 'Phải lớn hơn độ sáng của đèn + 200, nếu không đèn tự bật/tắt liên tục'
     }
     ;['s1', 's2'].forEach((s) => {
       const dry = v[`cal_${s}_dry`]; const wet = v[`cal_${s}_wet`]
@@ -58,9 +83,10 @@ function validate(type, v) {
 
 function toForm(params = {}) {
   const f = {}
-  ;[...CONTROLLER_FIELDS, ...CAMERA_FIELDS].forEach(({ k }) => { f[k] = params[k] ?? '' })
+  ;[...ctrlFields(), ...CAMERA_FIELDS].forEach(({ k }) => { f[k] = params[k] ?? '' })
   f.manual_ignores_cooldown = !!params.manual_ignores_cooldown
   f.flash = params.flash ?? 'auto'
+  f.frame_size = params.frame_size ?? ''
   f.cal_s1_dry = params.soil_cal?.s1?.dry ?? ''
   f.cal_s1_wet = params.soil_cal?.s1?.wet ?? ''
   f.cal_s2_dry = params.soil_cal?.s2?.dry ?? ''
@@ -73,7 +99,7 @@ function toForm(params = {}) {
 /** Chỉ gửi những khóa đã đổi so với cấu hình hiện tại. */
 function diff(type, form, params = {}) {
   const out = {}
-  const fields = type === 'CAMERA' ? CAMERA_FIELDS : CONTROLLER_FIELDS
+  const fields = type === 'CAMERA' ? CAMERA_FIELDS : ctrlFields()
   fields.forEach(({ k, int }) => {
     if (form[k] === '' || form[k] === undefined) return
     const n = int ? parseInt(form[k], 10) : Number(form[k])
@@ -81,6 +107,7 @@ function diff(type, form, params = {}) {
   })
   if (type === 'CAMERA') {
     if (form.flash !== (params.flash ?? 'auto')) out.flash = form.flash
+    if (form.frame_size && form.frame_size !== params.frame_size) out.frame_size = form.frame_size
     return out
   }
   if (form.manual_ignores_cooldown !== !!params.manual_ignores_cooldown) out.manual_ignores_cooldown = form.manual_ignores_cooldown
@@ -194,6 +221,14 @@ export default function ConfigPanel({ device, canEdit }) {
                 </label>
               ))}
               {device.type === 'CAMERA' && (
+                <label>Độ phân giải ảnh
+                  <select value={form.frame_size} onChange={set('frame_size')}>
+                    <option value="">Mặc định của thiết bị (SVGA 800×600)</option>
+                    {FRAME_SIZES.map((x) => <option key={x} value={x}>{x}</option>)}
+                  </select>
+                </label>
+              )}
+              {device.type === 'CAMERA' && (
                 <label>Flash khi chụp theo lịch
                   <select value={form.flash} onChange={set('flash')}>
                     <option value="auto">Tự động</option><option value="on">Luôn bật</option><option value="off">Tắt</option>
@@ -207,6 +242,18 @@ export default function ConfigPanel({ device, canEdit }) {
                   <input type="checkbox" checked={form.manual_ignores_cooldown} onChange={set('manual_ignores_cooldown')} />
                   Lệnh bơm từ web bỏ qua thời gian nghỉ
                 </label>
+                <div className="label" style={{ marginTop: 12 }}>Lịch chiếu sáng (đèn LED)</div>
+                <p className="muted small">Đèn chỉ bù khi thiếu sáng trong khung giờ (giờ Việt Nam). Ô để trống thì thiết bị dùng giá trị mặc định ghi mờ trong ô. Muốn demo ngoài giờ: đặt 0–24, demo xong trả lại 6–20.</p>
+                <div className="grid form-grid">
+                  {LAMP_FIELDS.map((f) => (
+                    <label key={f.k} className={errs[f.k] ? 'has-error' : ''}>
+                      {f.label}{f.unit && <span className="muted"> ({f.unit})</span>}
+                      <input type="number" min={f.min} max={f.max} step={1} placeholder={String(f.def)}
+                        value={form[f.k]} onChange={set(f.k)} />
+                      <span className="hint">{errs[f.k] || `${f.min}–${f.max}`}</span>
+                    </label>
+                  ))}
+                </div>
                 <details className="more">
                   <summary>Hiệu chuẩn cảm biến (nâng cao)</summary>
                   <div className="grid form-grid">

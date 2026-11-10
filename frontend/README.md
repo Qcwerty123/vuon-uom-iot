@@ -49,8 +49,8 @@ cd frontend
 | 1 | Đăng nhập (sai mật khẩu, khóa tạm 423) | — | Tất cả |
 | 2 | Tổng quan: thẻ thiết bị, số đo realtime có chữ theo ngưỡng, bơm/quạt/chế độ/khóa, ảnh mới nhất, cảnh báo đang mở | `#/` | Tất cả |
 | 3 | Chi tiết thiết bị: thông tin, fw/hw, last seen, biểu đồ 1 giờ realtime, sự kiện, lịch sử lệnh và trạng thái, bảo trì | `#/devices/:id` | Theo gán |
-| 4 | Điều khiển: bơm (chọn giây), quạt, AUTO/MANUAL, chụp ảnh, flash; nút hiện Đang chờ → kết quả | tab Điều khiển | CONTROL |
-| 5 | Cấu hình: kiểm tra miền giá trị, `soil_low < soil_high`, hiệu chuẩn; "Chờ thiết bị áp dụng"; lịch sử phiên bản | tab Cấu hình | CONTROL (VIEW chỉ đọc) |
+| 4 | Điều khiển: bơm (chọn giây), quạt, đèn (giữ N phút), AUTO/MANUAL, chụp ảnh, flash; nút hiện Đang chờ → kết quả | tab Điều khiển | CONTROL |
+| 5 | Cấu hình: kiểm tra miền giá trị, `soil_low < soil_high`, lịch chiếu sáng (`lamp_*`), hiệu chuẩn; "Chờ thiết bị áp dụng"; lịch sử phiên bản | tab Cấu hình | CONTROL (VIEW chỉ đọc) |
 | 6 | Quản lý thiết bị: đăng ký, cấp phát (secret một lần + copy + khối `secrets.h`), cấp lại khóa, gán quyền, sửa, tạm khóa/mở khóa, thu hồi (nhập lại mã) | `#/admin/devices` | ADMIN |
 | 7 | Cảnh báo: lọc trạng thái/mức/thiết bị, nhận xử lý, đóng có ghi chú | `#/alerts` | Theo gán |
 | 8 | Lịch sử dữ liệu: metric, khoảng thời gian, biểu đồ, min/max/avg, bảng, xuất CSV | `#/history` | Theo gán |

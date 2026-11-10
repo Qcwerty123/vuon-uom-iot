@@ -66,12 +66,13 @@ export function MetricTile({ metric, m, cfg, compact }) {
 
 /** Trạng thái bơm, quạt, chế độ, khóa an toàn (state trong telemetry §8.3). */
 export function ActuatorState({ state }) {
-  if (!state || !Object.keys(state).length) return <span className="muted">Chưa có trạng thái bơm/quạt</span>
+  if (!state || !Object.keys(state).length) return <span className="muted">Chưa có trạng thái bơm/quạt/đèn</span>
   const locks = Array.isArray(state.locks) ? state.locks : []
   return (
     <div className="row wrap gap-s">
       <Badge tone={state.pump ? 'ok' : 'muted'}>Bơm: {state.pump ? 'Đang chạy' : 'Tắt'}</Badge>
       <Badge tone={state.fan ? 'ok' : 'muted'}>Quạt: {state.fan ? 'Đang chạy' : 'Tắt'}</Badge>
+      {state.lamp !== undefined && <Badge tone={state.lamp ? 'ok' : 'muted'}>Đèn: {state.lamp ? 'Đang bật' : 'Tắt'}</Badge>}
       {state.mode && <Badge tone="info">Chế độ: {state.mode === 'AUTO' ? 'Tự động' : 'Thủ công'}</Badge>}
       {locks.map((l) => <Badge key={l} tone="warn">Khóa: {LOCKS[l] || l}</Badge>)}
     </div>

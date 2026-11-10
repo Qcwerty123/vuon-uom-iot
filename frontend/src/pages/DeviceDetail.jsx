@@ -179,6 +179,7 @@ function Overview({ device }) {
               ))}
             </div>
             <ActuatorState state={state} />
+            <LampToday device={device} lampNow={state?.lamp} />
           </Card>
         )}
         {device.type === 'CAMERA' && (
@@ -190,6 +191,47 @@ function Overview({ device }) {
       {device.type === 'CONTROLLER' && <LiveChart device={device} />}
     </div>
   )
+}
+
+/** "Số giờ chiếu sáng hôm nay" (đặc tả §6.11), tính từ event lamp_on/lamp_off kể từ 0 giờ (giờ máy xem). */
+function lampHoursToday(events, lampNow, now = Date.now()) {
+  const start = new Date(now); start.setHours(0, 0, 0, 0)
+  const t0 = start.getTime()
+  const evs = events.filter((e) => e.type === 'lamp_on' || e.type === 'lamp_off')
+    .map((e) => ({ on: e.type === 'lamp_on', t: new Date(e.ts).getTime() }))
+    .filter((e) => !Number.isNaN(e.t)).sort((a, b) => a.t - b.t)
+  let on = false; let since = t0; let ms = 0
+  evs.forEach((e) => {
+    if (e.t < t0) { on = e.on; return }
+    if (on && !e.on) ms += e.t - since
+    if (!on && e.on) since = e.t
+    on = e.on
+  })
+  // Telemetry nói đèn đang tắt thì tin telemetry; đang bật mà không thấy event bật thì chưa tính đoạn hiện tại.
+  if (lampNow !== undefined && lampNow !== null && !lampNow) on = false
+  if (on) ms += now - Math.max(since, t0)
+  return ms / HOUR
+}
+
+function LampToday({ device, lampNow }) {
+  const [events, setEvents] = useState(null)
+  const load = useCallback(async () => {
+    const start = new Date(); start.setHours(0, 0, 0, 0)
+    try {
+      setEvents(await get(`/devices/${device.id}/events`, {
+        type: 'lamp_on,lamp_off', from: new Date(start.getTime() - 24 * HOUR).toISOString(), limit: 1000,
+      }))
+    } catch { setEvents([]) }
+  }, [device.id])
+  useEffect(() => { load() }, [load])
+  useRealtime((m) => {
+    if (m.type === 'reconnected') load()
+    if (m.type === 'device_event' && m.deviceId === device.id && String(m.eventType).startsWith('lamp_')) load()
+  }, [device.id, load])
+  useTick(60000)
+  if (events === null) return null
+  const h = lampHoursToday(events, lampNow)
+  return <p className="muted small">Số giờ chiếu sáng hôm nay: <b>{h.toFixed(1)} giờ</b></p>
 }
 
 /** Biểu đồ 1 giờ gần nhất, thêm điểm mới từ WebSocket. */

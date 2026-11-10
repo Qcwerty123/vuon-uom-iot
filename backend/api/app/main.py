@@ -39,6 +39,17 @@ _setup_logging()
 log = logging.getLogger("app")
 
 
+def _migrate() -> None:
+    """Nâng cấp nhỏ, chạy lặp lại được, cho CSDL dựng trước khi đổi 01_schema.sql (không cần reset-db)."""
+    stmts = ["ALTER TABLE diagnoses ADD COLUMN IF NOT EXISTS lamp_on BOOLEAN"]   # v1.4 §6.11
+    for sql in stmts:
+        try:
+            with engine.begin() as c:
+                c.execute(text(sql))
+        except Exception as e:  # noqa: BLE001 — không chặn khởi động, chỉ báo
+            log.warning("Không áp được nâng cấp CSDL '%s': %s", sql, e)
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     if not settings.jwt_secret or len(settings.jwt_secret) < 32:
@@ -46,6 +57,7 @@ async def lifespan(_app: FastAPI):
     realtime.bind_loop(asyncio.get_running_loop())
     with engine.connect() as c:
         c.execute(text("select 1"))
+    _migrate()
     seed.run()
     ingest.start()
     jobs.start()

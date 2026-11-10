@@ -36,7 +36,7 @@ def diagnosis_out(d: Diagnosis) -> dict:
             "topLabel": d.top_label, "topConfidence": d.top_confidence, "abnormalTiles": d.abnormal_tiles or [],
             "tiles": [{"r": t.get("r"), "c": t.get("c"), "label": t.get("label"), "conf": t.get("conf"),
                        "probs": t.get("probs")} for t in (d.tiles or [])],
-            "modelVersion": d.model_version, "trigger": d.trigger, "cmdId": d.cmd_id,
+            "modelVersion": d.model_version, "trigger": d.trigger, "cmdId": d.cmd_id, "lampOn": d.lamp_on,
             "reviewVerdict": d.review_verdict, "correctLabel": d.correct_label, "reviewedBy": d.reviewed_by,
             "reviewedAt": d.reviewed_at, "createdAt": d.created_at}
 

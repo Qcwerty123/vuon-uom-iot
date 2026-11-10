@@ -34,7 +34,7 @@ from ..audit import audit
 from ..config import settings
 from ..db import SessionLocal
 from ..errors import ApiError
-from ..models import Command, Device, Diagnosis
+from ..models import Command, Device, Diagnosis, Zone
 from ..security import verify_password
 
 router = APIRouter(prefix="/device-api/v1", tags=["device-api"])
@@ -133,6 +133,27 @@ def _check_jpeg(body: bytes) -> None:
         raise ApiError(400, "VALIDATION_ERROR", "Không đọc được ảnh JPEG")
 
 
+def _garden_of(db, dev: Device) -> int | None:
+    z = db.get(Zone, dev.zone_id) if dev.zone_id else None
+    return z.garden_id if z else None
+
+
+def _lamp_state(db, cam: Device) -> bool | None:
+    """Trạng thái đèn Node 1 cùng vườn lúc chụp (§6.11), lấy từ telemetry gần nhất (ingest.latest_state).
+    Thiết bị chưa gán khu được coi là cùng vườn mặc định. Không có số liệu → None."""
+    try:
+        g = _garden_of(db, cam)
+        ctrls = db.scalars(select(Device).where(Device.type == "CONTROLLER", Device.status != "DECOMMISSIONED")
+                           .order_by(Device.last_seen_at.desc().nulls_last()))
+        for c in ctrls:
+            st = ingest.latest_state.get(c.id) or {}
+            if "lamp" in st and _garden_of(db, c) == g:
+                return bool(st["lamp"])
+    except Exception:  # noqa: BLE001 — chỉ là dữ liệu phụ, không làm hỏng upload
+        log.exception("Không lấy được trạng thái đèn")
+    return None
+
+
 def _store(device_id: int, code: str, body: bytes, captured: datetime, trigger: str, cmd_id: str | None,
            exempt: bool) -> int:
     """Ghi file tạm → sha256 → tạo diagnoses QUEUED → đổi tên file (atomic) → commit."""
@@ -153,7 +174,7 @@ def _store(device_id: int, code: str, body: bytes, captured: datetime, trigger: 
             if exempt and cmd_id:
                 trigger = "command"
             d = Diagnosis(device_id=device_id, image_path=f"{rel_dir}/pending", image_sha256=sha, captured_at=captured,
-                          trigger=trigger, cmd_id=cmd_id, status="QUEUED")
+                          trigger=trigger, cmd_id=cmd_id, status="QUEUED", lamp_on=_lamp_state(db, dev))
             db.add(d)
             db.flush()
             final = folder / f"{d.id}.jpg"

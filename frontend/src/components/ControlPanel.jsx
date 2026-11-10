@@ -23,6 +23,7 @@ export default function ControlPanel({ device, state }) {
   const [error, setError] = useState(null)
   const [duration, setDuration] = useState(5)
   const [flash, setFlash] = useState('off')
+  const [lampMin, setLampMin] = useState(30)
   const timers = useRef({})
   const seen = useRef({}) // cmdId -> bản tin command_update (ack có thể về trước cả phản hồi HTTP)
 
@@ -106,6 +107,20 @@ export default function ControlPanel({ device, state }) {
             <div className="row wrap gap-s"><CmdStatus c={cmds.fan_on} /><CmdStatus c={cmds.fan_off} /></div>
           </div>
           <div className="control-row">
+            <div className="control-name">Đèn chiếu sáng</div>
+            <div className="row wrap gap-s">
+              <label className="inline">Giữ
+                <select value={lampMin} onChange={(e) => setLampMin(Number(e.target.value))}>
+                  {[5, 15, 30, 60].map((m) => <option key={m} value={m}>{m} phút</option>)}
+                </select>
+              </label>
+              {btn('lamp_on', 'Bật đèn', 'lamp_on', { duration_min: lampMin })}
+              {btn('lamp_off', 'Tắt đèn', 'lamp_off')}
+            </div>
+            <div className="row wrap gap-s"><CmdStatus c={cmds.lamp_on} /><CmdStatus c={cmds.lamp_off} /></div>
+            <div className="muted small">Ở chế độ AUTO, lệnh tay giữ trong thời gian đã chọn rồi đèn quay về tự động. Quá nóng thì đèn bị khóa.</div>
+          </div>
+          <div className="control-row">
             <div className="control-name">Chế độ</div>
             <div className="row wrap gap-s">
               {btn('mode_auto', 'Tự động (AUTO)', 'set_mode', { mode: 'AUTO' })}
@@ -154,7 +169,7 @@ export default function ControlPanel({ device, state }) {
           <CmdStatus c={cmds.request_status} /><CmdStatus c={cmds.reboot} />
         </div>
       </details>
-      <p className="muted small">Giới hạn 10 lệnh/phút cho mỗi thiết bị. Thiết bị có thể từ chối lệnh nếu bể cạn, đang nghỉ giữa hai lần tưới hoặc đang khóa tại chỗ.</p>
+      <p className="muted small">Giới hạn 10 lệnh/phút cho mỗi thiết bị. Thiết bị có thể từ chối lệnh nếu bể cạn, đang nghỉ giữa hai lần tưới, đang khóa tại chỗ hoặc quá nóng (đèn).</p>
     </Card>
   )
 }

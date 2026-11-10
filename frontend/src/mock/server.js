@@ -63,7 +63,7 @@ const alerts = [
 // Telemetry: 2 giờ lịch sử mỗi 30 s cho ctl-0001, sau đó 3 s một bản tin.
 const telemetry = [] // {deviceId, metric, ts, value, ok, seq}
 let seq = 10000
-const sim = { soil1: 44, soil2: 46, air_temp: 29, air_hum: 76, light: 1800, tank: 62, pump: 0, fan: 0, mode: 'AUTO', locks: [], pumpUntil: 0 }
+const sim = { soil1: 44, soil2: 46, air_temp: 29, air_hum: 76, light: 1800, tank: 62, pump: 0, fan: 0, lamp: 0, mode: 'AUTO', locks: [], pumpUntil: 0 }
 
 function sample(t) {
   const h = new Date(t).getHours() + new Date(t).getMinutes() / 60
@@ -244,7 +244,7 @@ function startTicker() {
         openAlert(d, 4, 'EVENT', 'WARNING', `${d.deviceCode}: Bể sắp cạn (${Math.round(sim.tank)}%)`, { tank: Math.round(sim.tank) })
       }
       publish(d.id, { type: 'telemetry', deviceId: d.id, ts: iso(t), seq, buffered: false, data,
-        state: { pump: sim.pump, fan: sim.fan, mode: sim.mode, locks: sim.locks } })
+        state: { pump: sim.pump, fan: sim.fan, lamp: sim.lamp, mode: sim.mode, locks: sim.locks } })
     })
   }, 3000)
 }
@@ -509,7 +509,7 @@ route('GET', '/devices/:id/telemetry/latest', ({ params, user }) => {
     const r = telemetry[i]
     if (r.deviceId === d.id && !metrics[r.metric]) metrics[r.metric] = { value: r.value, unit: '', ok: r.ok, ts: r.ts, seq: r.seq }
   }
-  return ok({ deviceId: d.id, metrics, state: d.id === 1 ? { pump: sim.pump, fan: sim.fan, mode: sim.mode, locks: sim.locks } : null })
+  return ok({ deviceId: d.id, metrics, state: d.id === 1 ? { pump: sim.pump, fan: sim.fan, lamp: sim.lamp, mode: sim.mode, locks: sim.locks } : null })
 })
 function rangeOf(query, hours = 1) {
   const to = query.to ? new Date(query.to).getTime() : now()
@@ -578,6 +578,8 @@ route('POST', '/devices/:id/commands', ({ params, body, user }) => {
       if (c.action === 'pump_off' && sim.pump) { sim.pump = 0; pushEvent(d, 'pump_off', { source: 'remote' }) }
       if (c.action === 'fan_on') { sim.fan = 1; pushEvent(d, 'fan_on', { source: 'remote' }) }
       if (c.action === 'fan_off') { sim.fan = 0; pushEvent(d, 'fan_off', { source: 'remote' }) }
+      if (c.action === 'lamp_on') { sim.lamp = 1; pushEvent(d, 'lamp_on', { source: 'remote', reason: 'command' }) }
+      if (c.action === 'lamp_off') { sim.lamp = 0; pushEvent(d, 'lamp_off', { source: 'remote', reason: 'command' }) }
       if (c.action === 'set_mode') sim.mode = c.params.mode
       if (c.action === 'capture') {
         const list = diagList(d.id)
@@ -665,7 +667,7 @@ route('GET', '/dashboard/summary', ({ user }) => {
   list.forEach((d) => { byStatus[d.status] = (byStatus[d.status] || 0) + 1 })
   return ok({
     devices: list.map((d) => ({ id: d.id, deviceCode: d.deviceCode, name: d.name, type: d.type, status: d.status, online: d.online, lastSeenAt: d.lastSeenAt,
-      permission: permissionOf(user, d.id), state: d.id === 1 ? { pump: sim.pump, fan: sim.fan, mode: sim.mode, locks: sim.locks } : null })),
+      permission: permissionOf(user, d.id), state: d.id === 1 ? { pump: sim.pump, fan: sim.fan, lamp: sim.lamp, mode: sim.mode, locks: sim.locks } : null })),
     countByStatus: byStatus,
     onlineCount: list.filter((d) => d.online).length,
     openAlerts: alerts.filter((a) => permissionOf(user, a.deviceId) && a.status !== 'CLOSED').map(clone),

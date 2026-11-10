@@ -91,8 +91,8 @@ def events(device_id: int, type: str | None = None, frm: datetime | None = Query
     frm, to = _range(frm, to, 24)
     q = (select(DeviceEvent).where(DeviceEvent.device_id == device_id, DeviceEvent.ts >= frm, DeviceEvent.ts <= to)
          .order_by(DeviceEvent.ts.desc()).limit(limit))
-    if type:
-        q = q.where(DeviceEvent.type == type)
+    if type:  # một loại hoặc nhiều loại cách nhau dấu phẩy, ví dụ lamp_on,lamp_off
+        q = q.where(DeviceEvent.type.in_([t.strip() for t in type.split(",") if t.strip()]))
     return [{"id": e.id, "seq": e.seq, "type": e.type, "detail": e.detail, "ts": e.ts} for e in db.scalars(q)]
 
 

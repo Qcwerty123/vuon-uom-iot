@@ -49,6 +49,7 @@ Thumbs.db
 /runtime/
 /logs/
 /DINH-HUONG.md
+/CHECKPOINT.md
 **/.venv/
 frontend/node_modules/
 *.log

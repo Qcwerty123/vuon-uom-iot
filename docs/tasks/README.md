@@ -8,9 +8,10 @@ Mỗi file `WP-xx-*.md` là một gói việc tự đủ để một agent hoặ
 | WP-01 | Thiết bị mô phỏng Node 1 (`tests/load/simulator.py`, `scripts/windows/sim.ps1`) | **Xong 06/11** (đã chạy thử: lệnh, cấu hình, ack ~15 ms) |
 | WP-02 | Backend lõi FastAPI (`backend/api`): auth, thiết bị + cấp phát dynsec, ingest, WebSocket | **Xong 06/11** — `test-backend.ps1` đạt 24/24 |
 | WP-03 | Backend nghiệp vụ: lệnh, cấu hình, offline, cảnh báo + Telegram, người dùng, audit | **Xong 06/11** — `test-backend.ps1 -Wp 03` đạt 35/35 |
-| WP-04 | Frontend React (`frontend/`) | **Đợt 1 xong 06/11** (đủ 11 màn, chạy thử bằng dữ liệu giả) — `WP-04-report.md` |
+| WP-04 | Frontend React (`frontend/`) | **Đợt 1 xong 06/11** (đủ 11 màn) — `WP-04-report.md`. Đã build và chạy với backend thật 10/11 (`MOCK.diagnoses=false`) |
 | WP-N1 | Nối Node 1, Node 2 thật vào hệ thống qua backend | Node 1 **đã nối 07/11**: ACTIVE, telemetry, lệnh bơm EXECUTED (ack 0,2 s). Còn: thử mất nguồn, hiệu chuẩn đất/bể, BH1750 báo lỗi. Node 2 chưa |
-| WP-07 | Ảnh + AI chẩn đoán lá: upload `/device-api/v1/images`, AI service 8001, DiagnosisWorker, AI_LEAF + Telegram ảnh, API chẩn đoán, gardens/zones | **Giao 09/11** — `WP-07-anh-ai.md`, hạn 14/11 |
+| WP-07 | Ảnh + AI chẩn đoán lá: upload `/device-api/v1/images`, AI service 8001, DiagnosisWorker, AI_LEAF + Telegram ảnh, API chẩn đoán, gardens/zones | **Xong 10/11** — `WP-07-report.md`; nghiệm thu trên máy chủ 10/11: -Wp 02 24/24, -Wp 03 35/35, -Wp 07 57/57 |
+| WP-08 | Đèn chiếu sáng Node 1 (§6.11) phía backend, web, Node 1 giả; cấu hình camera khớp firmware Node 2; `diagnoses.lamp_on` | **Làm 10/11** (Cách 1) — `test-backend.ps1 -Wp 08` |
 
 Danh sách đầy đủ các gói: `DINH-HUONG.md` mục 7 (bản riêng của nhóm, không commit).
 

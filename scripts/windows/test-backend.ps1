@@ -2,6 +2,7 @@
 #   .\scripts\windows\test-backend.ps1           # WP-02 (đăng nhập, thiết bị, ingest, WebSocket)
 #   .\scripts\windows\test-backend.ps1 -Wp 03    # WP-03 (lệnh, cấu hình, offline, cảnh báo, người dùng, audit)
 #   .\scripts\windows\test-backend.ps1 -Wp 07    # WP-07 (upload ảnh, AI stub, chẩn đoán, AI_LEAF, gardens/zones)
+#   .\scripts\windows\test-backend.ps1 -Wp 08    # WP-08 (đèn chiếu sáng Node 1, cấu hình camera, diagnoses.lamp_on)
 #     -Wp 07 tạm dừng AI service thật, test tự bật AI_MODE=stub ở 127.0.0.1:8001, xong thì bật lại AI thật (start.ps1).
 # Tương thích Windows PowerShell 5.1
 param([string]$Wp = "02")
