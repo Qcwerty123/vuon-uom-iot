@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { get, post } from '../api/client.js'
+import { realtime } from '../api/realtime.js'
 import { canControl, useAuth } from '../auth.jsx'
 import { useDevices } from '../devices.jsx'
 import { ActuatorState, MetricTile, mergeTelemetry } from '../components/device.jsx'
@@ -23,6 +24,7 @@ export default function Dashboard() {
   const loadSummary = useCallback(async () => {
     try {
       const s = await get('/dashboard/summary')
+      realtime.watch(s.devices.map((d) => d.id))  // nhận WS cả thiết bị chưa có trong danh sách dùng chung
       setSummary(s)
       setError(null)
       return s
@@ -60,6 +62,10 @@ export default function Dashboard() {
   }, [loadSummary])
 
   useEffect(() => { loadAll() }, [loadAll])
+  useEffect(() => {  // thiết bị mới, cảnh báo, trạng thái: làm mới tổng quan mỗi 30 s
+    const t = setInterval(() => { loadSummary() }, 30000)
+    return () => clearInterval(t)
+  }, [loadSummary])
 
   useRealtime((m) => {
     if (m.type === 'telemetry') {

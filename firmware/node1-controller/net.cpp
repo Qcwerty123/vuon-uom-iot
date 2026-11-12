@@ -5,6 +5,7 @@
 #include <sys/time.h>
 #include "secrets.h"
 #include "protocol.h"
+#include "identity.h"
 
 #ifndef NTP_SERVER
 #define NTP_SERVER "pool.ntp.org"
@@ -32,10 +33,10 @@ static void onMessage(char* topic, uint8_t* payload, unsigned int len) {
 
 static void startWifi() {
   WiFi.disconnect();
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  WiFi.begin(ident.wifiSsid, ident.wifiPass);
   wifiConnecting = true;
   wifiAttemptAt = millis();
-  Serial.printf("[net] ket noi WiFi '%s'...\n", WIFI_SSID);
+  Serial.printf("[net] ket noi WiFi '%s'...\n", ident.wifiSsid);
 }
 
 static void startNtp() {
@@ -44,8 +45,8 @@ static void startNtp() {
 }
 
 static bool mqttConnect() {
-  Serial.printf("[net] ket noi MQTT %s:%d...\n", MQTT_HOST, MQTT_PORT);
-  bool ok = mqtt.connect(DEVICE_CODE, DEVICE_CODE, DEVICE_SECRET,
+  Serial.printf("[net] ket noi MQTT %s:%d...\n", ident.mqttHost, ident.mqttPort);
+  bool ok = mqtt.connect(ident.code, ident.code, ident.secret,
                          lwtTopic, 1, true, lwtPayload, true);
   if (!ok) {
     // 4 = sai tài khoản, 5 = không được phép (thiết bị bị khóa / thu hồi)
@@ -62,12 +63,12 @@ static bool mqttConnect() {
 }
 
 void netBegin() {
-  snprintf(topicBase, sizeof topicBase, "nursery/%s/%s/", GARDEN_CODE, DEVICE_CODE);
+  snprintf(topicBase, sizeof topicBase, "nursery/%s/%s/", ident.garden, ident.code);
   snprintf(lwtTopic, sizeof lwtTopic, "%sstatus", topicBase);
-  snprintf(lwtPayload, sizeof lwtPayload, "{\"v\":1,\"device_id\":\"%s\",\"online\":false}", DEVICE_CODE);
+  snprintf(lwtPayload, sizeof lwtPayload, "{\"v\":1,\"device_id\":\"%s\",\"online\":false}", ident.code);
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(false);  // tự quản lý kết nối lại có backoff
-  mqtt.setServer(MQTT_HOST, MQTT_PORT);
+  mqtt.setServer(ident.mqttHost, ident.mqttPort);
   mqtt.setCallback(onMessage);
   mqtt.setBufferSize(1024);
   mqtt.setKeepAlive(30);
@@ -139,7 +140,7 @@ uint64_t nowMs() {
 }
 
 bool timeSynced() { return nowMs() != 0; }
-const char* deviceCode() { return DEVICE_CODE; }
+const char* deviceCode() { return ident.code; }
 int wifiRssi() { return wifiUp() ? WiFi.RSSI() : 0; }
 
 void netIp(char* buf, size_t n) {

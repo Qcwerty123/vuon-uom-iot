@@ -2,7 +2,7 @@
 #pragma once
 #include <Arduino.h>
 
-#define FW_VERSION "1.1.0"   // 1.1.0: đèn chiếu sáng, lệch pha relay, khóa nhiệt
+#define FW_VERSION "1.2.0"   // 1.1.0: đèn chiếu sáng, lệch pha relay, khóa nhiệt
 #define HW_VERSION "node1-r1"
 
 // Jumper relay đặt ở H (kích mức cao) — hướng dẫn lắp đặt §C8.

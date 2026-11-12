@@ -6,6 +6,7 @@ import { useDevices } from '../devices.jsx'
 import { navigate } from '../router.js'
 import { Badge, Card, Empty, ErrorBox, Spinner, StatusBadge, useRealtime, useToast } from '../components/ui.jsx'
 import { MOCK } from '../config.js'
+import ImageViewer from '../components/ImageViewer.jsx'
 import { DIAG_STATUS, LEAF, fmtTime } from '../labels.js'
 
 export default function Diagnoses({ query }) {
@@ -89,6 +90,9 @@ function DiagnosisView({ id, canReview, onReviewed }) {
   const toast = useToast()
   const [d, setD] = useState(null)
   const [img, setImg] = useState(null)
+  const [imgBytes, setImgBytes] = useState(0)
+  const [viewer, setViewer] = useState(false)
+  const [cropBox, setCropBox] = useState(null)
   const [error, setError] = useState(null)
   const [correct, setCorrect] = useState('')
   const [note, setNote] = useState('')
@@ -97,12 +101,17 @@ function DiagnosisView({ id, canReview, onReviewed }) {
   useEffect(() => {
     let url = null
     let alive = true
-    setD(null); setImg(null); setError(null)
-    get(`/diagnoses/${id}`).then((x) => { if (alive) setD(x) }).catch((e) => alive && setError(e))
+    setD(null); setImg(null); setError(null); setViewer(false)
+    get(`/diagnoses/${id}`).then((x) => {
+      if (!alive) return
+      setD(x)
+      // crop_box hiện tại của camera, để vẽ lưới 3×3 đúng vùng AI cắt (§15.4)
+      get(`/devices/${x.deviceId}/config`).then((c) => alive && setCropBox(c.params?.crop_box ?? null)).catch(() => {})
+    }).catch((e) => alive && setError(e))
     // Ảnh lấy qua API có kiểm tra quyền (không có URL tĩnh công khai, §10.9).
     getBlob(`/diagnoses/${id}/image`).then((b) => {
       url = URL.createObjectURL(b)
-      if (alive) setImg(url)
+      if (alive) { setImg(url); setImgBytes(b.size || 0) }
     }).catch(() => {})
     return () => { alive = false; if (url) URL.revokeObjectURL(url) }
   }, [id])
@@ -127,9 +136,19 @@ function DiagnosisView({ id, canReview, onReviewed }) {
   }
 
   return (
-    <Card title={`Ảnh lúc ${fmtTime(d.capturedAt)}`} actions={<StatusBadge map={DIAG_STATUS} value={d.status} />}>
+    <Card title={`Ảnh lúc ${fmtTime(d.capturedAt)}`} actions={(
+      <span className="row gap-s">
+        {img && <button className="btn" onClick={() => setViewer(true)}>Xem ảnh gốc</button>}
+        <StatusBadge map={DIAG_STATUS} value={d.status} />
+      </span>
+    )}>
+      {viewer && img && (
+        <ImageViewer src={img} bytes={imgBytes} fileName={`dg-${d.id}.jpg`} cropBox={cropBox}
+          title={`Ảnh #${d.id} · ${fmtTime(d.capturedAt)}`} onClose={() => setViewer(false)} />
+      )}
       <div className="diag-view">
-        <div className="tray">
+        <div className="tray" onClick={() => img && setViewer(true)} style={{ cursor: img ? 'zoom-in' : undefined }}
+          title={img ? 'Bấm để xem ảnh gốc' : undefined}>
           {img ? <img src={img} alt="Ảnh khay cây" /> : <div className="tray-placeholder">Đang tải ảnh…</div>}
           {d.status === 'DONE' && (
             <div className="tray-grid">

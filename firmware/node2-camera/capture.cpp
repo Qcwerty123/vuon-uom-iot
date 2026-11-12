@@ -2,7 +2,7 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
-#include "secrets.h"
+#include "identity.h"
 #include "camera.h"
 #include "config_store.h"
 #include "net.h"
@@ -89,8 +89,8 @@ static void doUpload() {
   if (wifiUp()) {
     HTTPClient http;
     http.setTimeout(HTTP_TIMEOUT_MS);
-    if (http.begin(httpClient, UPLOAD_URL)) {
-      http.setAuthorization(DEVICE_CODE, DEVICE_SECRET);   // Basic auth device_code:secret
+    if (http.begin(httpClient, ident.uploadUrl)) {
+      http.setAuthorization(ident.code, ident.secret);   // Basic auth device_code:secret
       http.addHeader("Content-Type", "image/jpeg");
       if (capturedAt) {
         char ts[24];

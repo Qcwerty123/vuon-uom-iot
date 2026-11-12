@@ -25,6 +25,12 @@ export function DevicesProvider({ children }) {
   }, [])
 
   useEffect(() => { reload() }, [reload])
+  // Tải lại định kỳ: thiết bị mới đăng ký sau khi mở web (ví dụ sim.ps1 register) cũng được đăng ký nhận WS,
+  // và trạng thái vẫn đúng nếu lỡ một bản tin device_status.
+  useEffect(() => {
+    const t = setInterval(() => { reload() }, 30000)
+    return () => clearInterval(t)
+  }, [reload])
 
   useRealtime((m) => {
     if (m.type === 'device_status') {

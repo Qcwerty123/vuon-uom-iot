@@ -27,6 +27,13 @@ def offline_detector() -> None:
                                                Device.last_seen_at < limit))
         for dev in devs:
             mark_offline(db, dev, f"Mất tín hiệu > {OFFLINE_AFTER_S} s")
+        # Đối soát: ACTIVE nhưng online=false là trạng thái sai (ví dụ dữ liệu cũ trước bản sửa fault_detector)
+        # → OFFLINE, không mở thêm cảnh báo (cảnh báo OFFLINE đã mở lúc mất kết nối).
+        for dev in db.scalars(select(Device).where(Device.online.is_(False), Device.status == "ACTIVE")):
+            transition(db, dev, "OFFLINE", "Đối soát: thiết bị không kết nối", strict=False)
+            realtime.publish(dev.id, {"type": "device_status", "deviceId": dev.id, "status": dev.status,
+                                      "online": False,
+                                      "lastSeenAt": dev.last_seen_at.isoformat() if dev.last_seen_at else None})
 
 
 def mark_offline(db, dev: Device, reason: str) -> None:
@@ -40,9 +47,11 @@ def mark_offline(db, dev: Device, reason: str) -> None:
 
 
 def fault_detector() -> None:
-    """sensor_fault kéo dài > 5 phút chưa có sensor_ok → ACTIVE chuyển FAULT; hết lỗi → ACTIVE."""
+    """sensor_fault kéo dài > 5 phút chưa có sensor_ok → ACTIVE chuyển FAULT; hết lỗi → ACTIVE.
+    Chỉ xét thiết bị đang online: thiết bị mất kết nối không gửi sensor_ok được, và event lỗi trôi khỏi cửa sổ
+    1 ngày không có nghĩa là cảm biến đã lành (trước đây FAULT + offline bị chuyển nhầm thành ACTIVE)."""
     with session_scope() as db:
-        for dev in db.scalars(select(Device).where(Device.status.in_(("ACTIVE", "FAULT")))):
+        for dev in db.scalars(select(Device).where(Device.status.in_(("ACTIVE", "FAULT")), Device.online.is_(True))):
             rows = db.execute(text(
                 "SELECT DISTINCT ON (detail->>'sensor') type, ts FROM device_events "
                 "WHERE device_id = :d AND type IN ('sensor_fault','sensor_ok') AND ts > now() - interval '1 day' "
