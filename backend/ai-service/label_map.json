@@ -1,9 +1,9 @@
 {
-  "_ghi_chu": "Gộp nhãn gốc về 3 lớp — đặc tả §15.2. Nhóm rà lại sau khi xem ảnh thật (C8).",
+  "_ghi_chu": "Gộp nhãn gốc về 3 lớp — đặc tả §15.2. Khóa nhóm 'plantvillage' khớp đúng tên lớp của mô hình trong model.json (chú ý 'Tomato___Healthy' viết hoa H). Nhóm rà lại sau khi xem ảnh thật (C8).",
   "classes": ["HEALTHY", "YELLOW", "SPOT"],
   "unknown_threshold": 0.6,
   "plantvillage": {
-    "Tomato___healthy": "HEALTHY",
+    "Tomato___Healthy": "HEALTHY",
     "Tomato___Tomato_Yellow_Leaf_Curl_Virus": "YELLOW",
     "Tomato___Leaf_Mold": "YELLOW",
     "Tomato___Spider_mites Two-spotted_spider_mite": "YELLOW",

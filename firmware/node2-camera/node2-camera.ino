@@ -7,6 +7,8 @@
  * Nạp qua đế ESP32-CAM-MB. Serial Monitor 115200, New Line.
  *
  * Trước khi nạp: tạo tab secrets.h từ secrets.example.h (KHÔNG commit secrets.h).
+ * v1.1.0: danh tính (WiFi/MQTT/device_code/secret/upload) ghi đè được bằng lệnh Serial và lưu NVS (identity.*);
+ *         không ghi đè thì dùng giá trị trong secrets.h như cũ.
  *
  * Các tab:
  *   app.h            hằng số, chân flash/LED
@@ -22,13 +24,16 @@
 #include "capture.h"
 #include "net.h"
 #include "protocol.h"
+#include "identity.h"
 
-static char serialLine[32];
+static char serialLine[160];   // đủ cho "set upload <url>"; dòng dài hơn bị bỏ cả dòng (không cắt âm thầm)
 static uint8_t serialLen = 0;
+static bool serialOverflow = false;
 static uint32_t nextLog = 0;
 
 static void printHelp() {
   Serial.println("Lenh Serial: p = chup + gui thu | f = nhay flash 1 s | c = cau hinh | n = mang | factory | h");
+  Serial.println("Danh tinh: id | set <code|secret|garden|host|port|ssid|pass|upload> <gia tri> | save | clear");
 }
 
 static void runSerialCommand(const char* cmd) {
@@ -49,6 +54,11 @@ static void runSerialCommand(const char* cmd) {
     Serial.println("Da ve cau hinh mac dinh, khoi dong lai...");
     delay(200);
     ESP.restart();
+  } else if (int r = identityCommand(cmd)) {
+    if (r == 2) {
+      delay(200);
+      ESP.restart();
+    }
   } else if (cmd[0]) {
     Serial.printf("Khong hieu lenh '%s'\n", cmd);
     printHelp();
@@ -61,10 +71,14 @@ static void serialLoop() {
     if (ch == '\r') continue;
     if (ch == '\n') {
       serialLine[serialLen] = 0;
-      runSerialCommand(serialLine);
+      if (serialOverflow) Serial.println("Dong lenh qua dai (>158 ky tu), da bo qua.");
+      else runSerialCommand(serialLine);
       serialLen = 0;
+      serialOverflow = false;
     } else if (serialLen < sizeof(serialLine) - 1) {
       serialLine[serialLen++] = ch;
+    } else {
+      serialOverflow = true;
     }
   }
 }
@@ -76,6 +90,7 @@ void setup() {
   delay(200);
   Serial.printf("\n== Node 2 camera · fw %s · hw %s ==\n", FW_VERSION, HW_VERSION);
   configBegin();
+  identityBegin();                 // trước netBegin(): net và capture dùng ident.*
   configPrint();
   cameraBegin();                   // khởi tạo camera TRƯỚC WiFi để tránh sụt áp cùng lúc
   netBegin();

@@ -49,6 +49,10 @@ Thumbs.db
 /runtime/
 /logs/
 /DINH-HUONG.md
+/CHECKPOINT.md
 **/.venv/
 frontend/node_modules/
 *.log
+
+# ---------- Ảnh mẫu kiểm thử sinh bằng tests/fixtures/make_images.py (không commit ảnh) ----------
+tests/fixtures/images/

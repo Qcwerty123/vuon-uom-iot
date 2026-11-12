@@ -1,0 +1,4 @@
+# Chỉ dùng khi huấn luyện / đánh giá trong notebook (hướng phát triển, §15.5). Dịch vụ suy luận không cần.
+-r requirements.txt
+scikit-learn
+matplotlib

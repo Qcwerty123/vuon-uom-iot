@@ -1,5 +1,6 @@
 // Sao chép thành tab "secrets.h" rồi điền giá trị thật. KHÔNG commit secrets.h.
 // DEVICE_CODE và DEVICE_SECRET lấy từ hộp thoại "Cấp phát thiết bị" trên web (chỉ hiện một lần).
+// Các giá trị này là MẶC ĐỊNH: có thể ghi đè lúc chạy bằng lệnh Serial (set ... / save), xem firmware/README.md.
 #pragma once
 
 #define WIFI_SSID      "ten-wifi-2.4GHz"

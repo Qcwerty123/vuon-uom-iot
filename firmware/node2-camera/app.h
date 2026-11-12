@@ -2,7 +2,7 @@
 #pragma once
 #include <Arduino.h>
 
-#define FW_VERSION "1.0.0"
+#define FW_VERSION "1.1.0"
 #define HW_VERSION "node2-r1"
 
 // Giờ Việt Nam (UTC+7) — chỉ dùng cho chế độ flash "auto" (bật 19h–6h)

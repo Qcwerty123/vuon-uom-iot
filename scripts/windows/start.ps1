@@ -1,10 +1,11 @@
 ﻿# start.ps1 — Khởi động toàn bộ dịch vụ của hệ thống VuonUom
 # Thứ tự: PostgreSQL -> Mosquitto -> AI service -> Backend
-# Bỏ qua AI service và Backend nếu chưa có mã nguồn
+# Bỏ qua AI service và Backend nếu chưa có mã nguồn. -NoAi: không bật AI service (backend vẫn chạy, ảnh nằm QUEUED)
 # Tương thích Windows PowerShell 5.1
 
 [CmdletBinding()]
-param([switch]$NoBackend)   # -NoBackend: không bật backend (khi chạy backend.ps1 để phát triển)
+param([switch]$NoBackend,   # -NoBackend: không bật backend (khi chạy backend.ps1 để phát triển)
+      [switch]$NoAi)        # -NoAi: không bật AI service
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptDir "common.ps1")
@@ -93,13 +94,35 @@ if (Test-PortListening 1883 "0.0.0.0") {
     }
 }
 
-# 3. AI Service (chưa có code -> bỏ qua và báo)
-$aiEntry = Get-RepoPath "backend/ai-service/main.py"
-if (Test-Path $aiEntry) {
-    Write-Log "AI Service: Đang khởi động..." "INFO"
-    # Sẽ bổ sung lệnh khởi động khi backend/ai-service được triển khai
-} else {
+# 3. AI service (FastAPI, chỉ nghe 127.0.0.1:8001 — §17.1). Nạp mô hình ~20 s trước khi mở cổng.
+$aiDir = Get-RepoPath "backend/ai-service"
+$aiPort = 8001
+if ($NoAi) {
+    Write-Log "AI service: bỏ qua (-NoAi). Ảnh mới sẽ ở trạng thái QUEUED cho tới khi AI chạy." "INFO"
+} elseif (-not (Test-Path (Join-Path $aiDir "app\main.py"))) {
     Write-Log "AI service: Chưa có mã nguồn (bỏ qua)." "INFO"
+} elseif (Test-PortListening $aiPort) {
+    Write-Log "AI service: Đang chạy trên cổng $aiPort." "INFO"
+} else {
+    $aiMode = if ($env:AI_MODE) { $env:AI_MODE } else { "model" }
+    $manifest = Get-Content -Raw -Encoding UTF8 (Join-Path $aiDir "model.json") | ConvertFrom-Json
+    $modelDir = Get-RepoPath $(if ($env:AI_MODEL_DIR) { $env:AI_MODEL_DIR } else { "runtime/ai/models" })
+    if ($aiMode -ne "stub" -and -not (Test-Path (Join-Path $modelDir $manifest.file))) {
+        Write-Log "AI service: chưa có trọng số $($manifest.file). Chạy .\scripts\windows\get-model.ps1 (AI sẽ báo no_model)." "WARN"
+    }
+    $py = Ensure-Venv $aiDir
+    if ($py) {
+        $outLog = Get-RepoPath "logs/services/ai-service-console.log"
+        $inner = "`"$py`" -m uvicorn app.main:app --app-dir `"$aiDir`" --host 127.0.0.1 --port $aiPort"
+        Start-StandaloneProcess "$env:ComSpec" "/c `"$inner >> `"$outLog`" 2>&1`"" | Out-Null
+        $ok = $false
+        for ($i = 0; $i -lt 120; $i++) {
+            Start-Sleep -Milliseconds 500
+            if (Test-PortListening $aiPort) { $ok = $true; break }
+        }
+        if ($ok) { Write-Log "AI service: Khởi động thành công (127.0.0.1:$aiPort, mode=$aiMode)." "SUCCESS" }
+        else { Write-Log "AI service: Không khởi động được trong 60 s. Xem logs/services/ai-service.log, ai-service-console.log" "ERROR" }
+    }
 }
 
 # 4. Backend (FastAPI, cổng BACKEND_PORT, phục vụ /api, /ws, web tĩnh, /device-api)

@@ -220,3 +220,30 @@ class Alert(Base):
     closed_at: Mapped[datetime | None] = mapped_column(TS)
     close_note: Mapped[str | None] = mapped_column(String(300))
     notified_at: Mapped[datetime | None] = mapped_column(TS)
+
+
+DiagStatus = pg_enum("diag_status", "QUEUED", "RUNNING", "DONE", "FAILED")
+
+
+class Diagnosis(Base):
+    """Một ảnh Node 2 + kết quả AI (đặc tả §11.2, §12.4). image_path tương đối theo IMAGE_DIR, không public."""
+    __tablename__ = "diagnoses"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    device_id: Mapped[int] = mapped_column(ForeignKey("devices.id"))
+    image_path: Mapped[str] = mapped_column(String(200))
+    image_sha256: Mapped[str] = mapped_column(String(64))
+    captured_at: Mapped[datetime] = mapped_column(TS)
+    trigger: Mapped[str] = mapped_column(String(10))
+    cmd_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False))
+    lamp_on: Mapped[bool | None] = mapped_column(Boolean)   # đèn Node 1 cùng vườn lúc chụp (§6.11)
+    status: Mapped[str] = mapped_column(DiagStatus, default="QUEUED")
+    model_version: Mapped[str | None] = mapped_column(String(30))
+    tiles: Mapped[list | None] = mapped_column(JSONB)
+    top_label: Mapped[str | None] = mapped_column(String(20))
+    top_confidence: Mapped[float | None] = mapped_column(Float)
+    abnormal_tiles: Mapped[list | None] = mapped_column(JSONB)
+    review_verdict: Mapped[str | None] = mapped_column(String(10))
+    correct_label: Mapped[str | None] = mapped_column(String(20))
+    reviewed_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    reviewed_at: Mapped[datetime | None] = mapped_column(TS)
+    created_at: Mapped[datetime] = mapped_column(TS, server_default="now()")

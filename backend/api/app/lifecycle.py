@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
-from . import realtime
+from . import device_auth, realtime
 from .errors import ApiError
 from .models import Device, DeviceStatusHistory
 
@@ -34,6 +34,7 @@ def transition(db: Session, dev: Device, new: str, reason: str, actor_id: int | 
             raise ApiError(409, "INVALID_STATE_TRANSITION", f"Không chuyển được từ {cur} sang {new}")
         return False
     dev.status = new
+    device_auth.invalidate(dev.device_code)   # §8.9: xóa cache xác thực upload ảnh khi trạng thái đổi
     db.add(DeviceStatusHistory(device_id=dev.id, from_status=cur, to_status=new, reason=reason[:200],
                                actor_id=actor_id))
     realtime.publish(dev.id, {"type": "device_status", "deviceId": dev.id, "status": new, "online": dev.online,

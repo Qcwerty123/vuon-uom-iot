@@ -22,7 +22,8 @@ TIMEOUT_S = 10
 RATE_PER_MIN = 10
 ONLINE_STATUSES = {"ACTIVE", "FAULT", "MAINTENANCE"}
 RESULT_STATUS = {"executed": "EXECUTED", "duration_capped": "EXECUTED", "failed": "FAILED"}
-REJECT_RESULTS = {"blocked_no_water", "blocked_cooldown", "blocked_sensor_fault", "blocked_local", "invalid",
+REJECT_RESULTS = {"blocked_no_water", "blocked_cooldown", "blocked_sensor_fault", "blocked_local", "blocked_overheat",
+                  "invalid",
                   "expired", "unsupported"}
 
 
@@ -54,8 +55,15 @@ def validate_action(dev_type: str, action: str, params: dict) -> dict:
             if not isinstance(d, int) or isinstance(d, bool) or not 1 <= d <= 60:
                 bad("params.duration_s", "duration_s phải là số nguyên 1–60")
             return {"duration_s": d}
-        if action in ("pump_off", "fan_on", "fan_off") or action in common:
+        if action in ("pump_off", "fan_on", "fan_off", "lamp_off") or action in common:
             return {}
+        if action == "lamp_on":  # §6.11: duration_min tùy chọn, 1–lamp_override_min (tối đa 240)
+            d = params.get("duration_min")
+            if d is None:
+                return {}
+            if not isinstance(d, int) or isinstance(d, bool) or not 1 <= d <= 240:
+                bad("params.duration_min", "duration_min phải là số nguyên 1–240")
+            return {"duration_min": d}
         if action == "set_mode":
             if params.get("mode") not in ("AUTO", "MANUAL"):
                 bad("params.mode", "mode phải là AUTO hoặc MANUAL")
@@ -137,10 +145,20 @@ def _push_cmd(c: Command) -> None:
 CFG_RANGES = {"soil_low": (0, 100), "soil_high": (0, 100), "pump_max_s": (1, 60), "cooldown_s": (0, 3600),
               "tank_min": (0, 100), "temp_high": (-10, 60), "temp_hyst": (0.5, 10), "hum_high": (0, 100),
               "hum_hyst": (1, 20), "telemetry_interval_s": (2, 300), "capture_interval_min": (1, 1440),
-              "jpeg_quality": (10, 63)}
-CFG_INT = {"pump_max_s", "cooldown_s", "telemetry_interval_s", "capture_interval_min", "jpeg_quality"}
+              "jpeg_quality": (8, 30), "warmup_frames": (0, 5),
+              # Chiếu sáng bổ sung Node 1 (§6.11)
+              "lamp_start_hour": (0, 23), "lamp_end_hour": (1, 24), "lamp_lux_low": (0, 65535),
+              "lamp_hyst": (1, 65535), "lamp_self_lux": (0, 5000), "lamp_hold_s": (2, 600),
+              "lamp_min_on_s": (10, 3600), "lamp_min_off_s": (10, 3600), "lamp_override_min": (1, 240)}
+LAMP_DEFAULTS = {"lamp_start_hour": 6, "lamp_end_hour": 20, "lamp_lux_low": 800, "lamp_hyst": 700,
+                 "lamp_self_lux": 300, "lamp_hold_s": 10, "lamp_min_on_s": 30, "lamp_min_off_s": 30,
+                 "lamp_override_min": 60}
+CFG_INT = {"pump_max_s", "cooldown_s", "telemetry_interval_s", "capture_interval_min", "jpeg_quality",
+           "warmup_frames", *LAMP_DEFAULTS}
+FRAME_SIZES = ("VGA", "SVGA", "XGA", "HD", "SXGA", "UXGA")  # firmware Node 2 (config_store.cpp)
 DEFAULTS = {"soil_low": 35, "soil_high": 55, "pump_max_s": 15, "cooldown_s": 120, "tank_min": 15, "temp_high": 32,
-            "temp_hyst": 2, "hum_high": 90, "hum_hyst": 5, "telemetry_interval_s": 10, "manual_ignores_cooldown": False}
+            "temp_hyst": 2, "hum_high": 90, "hum_hyst": 5, "telemetry_interval_s": 10, "manual_ignores_cooldown": False,
+            **LAMP_DEFAULTS}
 
 
 def validate_config(params: dict, base: dict) -> dict:
@@ -178,14 +196,36 @@ def validate_config(params: dict, base: dict) -> dict:
                     and 2 <= v["full_cm"] <= 400 and 2 <= v["empty_cm"] <= 400 and v["empty_cm"] - v["full_cm"] >= 2):
                 bad(k, "tank_cal cần empty_cm, full_cm (2–400 cm), empty lớn hơn full ít nhất 2")
             out[k] = v
+        elif k == "frame_size":
+            if v not in FRAME_SIZES:
+                bad(k, f"frame_size phải thuộc {', '.join(FRAME_SIZES)}")
+            out[k] = v
         elif k == "flash":
             if v not in ("on", "off", "auto"):
                 bad(k, "flash phải là on/off/auto")
+            out[k] = v
+        elif k == "crop_box":  # camera: vùng khay [x0, y0, x1, y1] (pixel, hoặc tỉ lệ 0..1) — §15.4
+            if v is not None and not (isinstance(v, list) and len(v) == 4
+                                      and all(isinstance(t, (int, float)) and not isinstance(t, bool) and t >= 0
+                                              for t in v) and v[2] > v[0] and v[3] > v[1]):
+                bad(k, "crop_box phải là [x0, y0, x1, y1] với x1 > x0, y1 > y0")
+            out[k] = v
+        elif k == "active_tiles":  # camera: các ô có cây [[r, c], ...] — §15.6
+            if v is not None and not (isinstance(v, list) and all(
+                    isinstance(t, list) and len(t) == 2 and all(isinstance(x, int) and 0 <= x <= 2 for x in t)
+                    for t in v)):
+                bad(k, "active_tiles phải là [[r, c], ...] với r, c trong 0..2")
             out[k] = v
         else:
             bad(k, f"Khóa cấu hình '{k}' không được hỗ trợ")
     if out.get("soil_low", 0) >= out.get("soil_high", 100):
         bad("soil_low", "soil_low phải nhỏ hơn soil_high")
+    if any(k in out for k in LAMP_DEFAULTS):  # ràng buộc chéo §6.11, giống firmware Node 1
+        lv = {k: out.get(k, d) for k, d in LAMP_DEFAULTS.items()}
+        if lv["lamp_end_hour"] <= lv["lamp_start_hour"]:
+            bad("lamp_end_hour", "lamp_end_hour phải lớn hơn lamp_start_hour")
+        if lv["lamp_hyst"] <= lv["lamp_self_lux"] + 200:
+            bad("lamp_hyst", "lamp_hyst phải lớn hơn lamp_self_lux + 200 (tránh đèn tự bật/tắt liên tục)")
     return out
 
 
@@ -272,6 +312,11 @@ def on_ack(db: Session, dev: Device, b: dict) -> None:
         cmd.detail = {**(cmd.detail or {}), "late_ack": result}
         return
     cmd.status = RESULT_STATUS.get(result, "REJECTED" if result in REJECT_RESULTS else "FAILED")
+    if cmd.action == "capture" and result == "executed":
+        # §7.4: ack executed {image_id:"img-<id>"} → lưu cả diagnosis_id dạng số để web mở thẳng bản ghi
+        img = str(detail.get("image_id") or "")
+        if img.startswith("img-") and img[4:].isdigit():
+            detail = {**detail, "diagnosis_id": int(img[4:])}
     cmd.result, cmd.detail, cmd.ack_at = result[:40], detail, _utc()
     _push_cmd(cmd)
 

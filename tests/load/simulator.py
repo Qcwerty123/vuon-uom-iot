@@ -215,12 +215,19 @@ DEFAULT_CFG = {
     "telemetry_interval_s": 10, "manual_ignores_cooldown": False,
     "soil_cal": {"s1": {"dry": 3150, "wet": 1320}, "s2": {"dry": 3210, "wet": 1290}},
     "tank_cal": {"empty_cm": 25.0, "full_cm": 5.0},
+    # Chiếu sáng bổ sung (§6.11), mặc định như firmware v1.1.0
+    "lamp_start_hour": 6, "lamp_end_hour": 20, "lamp_lux_low": 800, "lamp_hyst": 700, "lamp_self_lux": 300,
+    "lamp_hold_s": 10, "lamp_min_on_s": 30, "lamp_min_off_s": 30, "lamp_override_min": 60,
 }
 RANGES = {  # giống firmware config_store.cpp
     "soil_low": (0, 100), "soil_high": (0, 100), "pump_max_s": (1, 60), "cooldown_s": (0, 3600),
     "tank_min": (0, 100), "temp_high": (-10, 60), "temp_hyst": (0.5, 10), "hum_high": (0, 100),
     "hum_hyst": (1, 20), "telemetry_interval_s": (2, 300),
+    "lamp_start_hour": (0, 23), "lamp_end_hour": (1, 24), "lamp_lux_low": (0, 65535), "lamp_hyst": (1, 65535),
+    "lamp_self_lux": (0, 5000), "lamp_hold_s": (2, 600), "lamp_min_on_s": (10, 3600), "lamp_min_off_s": (10, 3600),
+    "lamp_override_min": (1, 240),
 }
+TZ_OFFSET_H = 7  # giờ Việt Nam cho khung chiếu sáng
 TANK_HYST = 3.0
 
 
@@ -267,6 +274,11 @@ class SimDevice:
         self.pump_ever = False
         self.fan = False
         self.fan_override_until = 0.0
+        self.lamp = False
+        self.lamp_changed = 0.0         # lần đổi trạng thái gần nhất (thời gian giữ tối thiểu)
+        self.lamp_want_since = 0.0      # debounce: thời điểm điều kiện đổi bắt đầu đúng liên tục
+        self.lamp_override_until = 0.0  # lệnh tay khi AUTO
+        self.overheat = False
         self.auto = saved.get("auto", True)
         self.tank_low = False
         # giao thức
@@ -377,6 +389,8 @@ class SimDevice:
             out.append("no_water")
         if self.cooldown_active():
             out.append("cooldown")
+        if self.overheat:
+            out.append("overheat")
         return out
 
     def telemetry_payload(self) -> dict:
@@ -393,8 +407,8 @@ class SimDevice:
             "buffered": False,
             "data": {"soil1": m(s1, "%"), "soil2": m(s2, "%"), "soil": m((s1 + s2) / 2, "%"),
                      "air_temp": m(self.temp, "C"), "air_hum": m(self.hum, "%RH"),
-                     "light": m(self.light, "lux"), "tank": tank},
-            "state": {"pump": int(self.pump), "fan": int(self.fan), "mode": "AUTO" if self.auto else "MANUAL",
+                     "light": m(self.measured_light(), "lux"), "tank": tank},
+            "state": {"pump": int(self.pump), "fan": int(self.fan), "lamp": int(self.lamp), "mode": "AUTO" if self.auto else "MANUAL",
                       "locks": self.locks()},
         }
 
@@ -451,6 +465,53 @@ class SimDevice:
         self.fan = on
         self.emit("fan_on" if on else "fan_off", {"source": src})
 
+    # ---------- đèn (§6.11) ----------
+    def measured_light(self) -> float:
+        return self.light + (self.cfg["lamp_self_lux"] if self.lamp else 0)
+
+    def lamp_set(self, on: bool, src: str, reason: str) -> None:
+        if self.lamp == on:
+            return
+        self.lamp = on
+        self.lamp_changed = time.time()
+        self.lamp_want_since = 0.0
+        self.emit("lamp_on" if on else "lamp_off", {"source": src, "reason": reason})
+
+    def lamp_control(self) -> None:
+        c, now = self.cfg, time.time()
+        thr = c["temp_high"] + 3
+        if not self.overheat and self.temp >= thr:
+            self.overheat = True
+        elif self.overheat and self.temp <= thr - c["temp_hyst"]:
+            self.overheat = False
+        if self.overheat:  # khóa nhiệt: mọi chế độ
+            self.lamp_override_until = 0.0
+            self.lamp_set(False, "auto", "overheat")
+            return
+        override_ended = False
+        if self.lamp_override_until and now >= self.lamp_override_until:
+            self.lamp_override_until, override_ended = 0.0, True
+        if not self.auto or self.lamp_override_until:  # MANUAL, hoặc lệnh tay còn hiệu lực (như firmware)
+            return
+        hour = (time.gmtime(now).tm_hour + TZ_OFFSET_H) % 24
+        if not c["lamp_start_hour"] <= hour < c["lamp_end_hour"]:
+            self.lamp_set(False, "auto", "override_end" if override_ended else "window_end")
+            self.lamp_want_since = 0.0
+            return
+        lux = self.measured_light()
+        if not self.lamp and lux < c["lamp_lux_low"]:
+            want, reason, hold_min = True, "low_light", c["lamp_min_off_s"]
+        elif self.lamp and lux >= c["lamp_lux_low"] + c["lamp_hyst"]:
+            want, reason, hold_min = False, "bright", c["lamp_min_on_s"]
+        else:
+            self.lamp_want_since = 0.0
+            return
+        if not self.lamp_want_since:
+            self.lamp_want_since = now
+        if now - self.lamp_want_since >= c["lamp_hold_s"] and (not self.lamp_changed
+                                                              or now - self.lamp_changed >= hold_min):
+            self.lamp_set(want, "auto", reason)
+
     def physics(self, dt: float) -> None:
         self.soil -= 0.02 * dt                                  # đất khô dần
         if self.pump:
@@ -476,6 +537,7 @@ class SimDevice:
                 self.pump_stop("no_water", "auto")
             elif self.pump_src == "auto" and self.soil >= self.cfg["soil_high"]:
                 self.pump_stop("soil_high", "auto")
+        self.lamp_control()
         if not self.auto:
             return
         if not self.pump and self.soil < self.cfg["soil_low"] and self.pump_block("auto") is None:
@@ -537,12 +599,29 @@ class SimDevice:
                 self.fan_override_until = time.time() + 300
                 detail = {"override_s": 300}
             res = "executed"
+        elif action in ("lamp_on", "lamp_off"):
+            on = action == "lamp_on"
+            dmin = params.get("duration_min", self.cfg["lamp_override_min"])
+            if on and (not isinstance(dmin, int) or isinstance(dmin, bool)
+                       or not 1 <= dmin <= self.cfg["lamp_override_min"]):
+                res, detail = "invalid", {"field": "duration_min"}
+            elif on and self.overheat:
+                res = "blocked_overheat"
+            else:
+                self.lamp_set(on, "remote", "command")
+                if self.auto:
+                    self.lamp_override_until = time.time() + dmin * 60
+                    detail = {"override_min": dmin}
+                res = "executed"
         elif action == "set_mode":
             m = params.get("mode")
             if m not in ("AUTO", "MANUAL"):
                 res, detail = "invalid", {"field": "mode"}
             else:
                 self.auto = m == "AUTO"
+                if self.auto:  # như firmware: về AUTO thì bỏ lệnh tay quạt/đèn
+                    self.fan_override_until = 0.0
+                    self.lamp_override_until = 0.0
                 if not self.auto and self.pump and self.pump_src == "auto":
                     self.pump_stop("mode_manual", "remote")
                 res, detail = "executed", {"mode": m}
@@ -585,6 +664,12 @@ class SimDevice:
         if new["soil_low"] >= new["soil_high"]:
             self.ack(cid, "config", "invalid", {"field": "soil_low"})
             return
+        if new["lamp_end_hour"] <= new["lamp_start_hour"]:
+            self.ack(cid, "config", "invalid", {"field": "lamp_end_hour"})
+            return
+        if new["lamp_hyst"] <= new["lamp_self_lux"] + 200:
+            self.ack(cid, "config", "invalid", {"field": "lamp_hyst"})
+            return
         self.cfg, self.cfg_version = new, ver
         self.save()
         self.ack(cid, "config", "executed")
@@ -596,6 +681,7 @@ class SimDevice:
         with self.lock:
             self.pump_stop("shutdown", "auto")
             self.fan_set(False, "auto")
+            self.lamp_set(False, "auto", "shutdown")
             self.flush_events()
         self.client.disconnect()
         self.client.loop_stop()

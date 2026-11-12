@@ -8,6 +8,8 @@
  *           BH1750 (Christopher Laws), Keypad, U8g2 — phiên bản theo firmware/LIBRARIES.md.
  *
  * Trước khi nạp: tạo tab secrets.h từ secrets.example.h (KHÔNG commit secrets.h).
+ * v1.2.0: danh tính (WiFi/MQTT/device_code/secret) ghi đè được bằng lệnh Serial và lưu NVS (identity.*);
+ *         không ghi đè thì dùng giá trị trong secrets.h như cũ.
  *
  * Các tab:
  *   app.h            hằng số, gán chân, kiểu dữ liệu chung
@@ -27,14 +29,17 @@
 #include "protocol.h"
 #include "buffer.h"
 #include "ui.h"
+#include "identity.h"
 
 static const uint32_t LOG_PERIOD_MS = 10000;
 static uint32_t nextLog = 0;
-static char serialLine[32];
+static char serialLine[160];   // đủ cho "set upload <url>"; dòng dài hơn bị bỏ cả dòng (không cắt âm thầm)
 static uint8_t serialLen = 0;
+static bool serialOverflow = false;
 
 static void printHelp() {
   Serial.println("Lenh Serial: s = cam bien | d = den/relay | c = cau hinh | n = mang | h = tro giup | factory = xoa cau hinh");
+  Serial.println("Danh tinh: id | set <code|secret|garden|host|port|ssid|pass> <gia tri> | save | clear");
 }
 
 static void runSerialCommand(const char* cmd) {
@@ -50,6 +55,12 @@ static void runSerialCommand(const char* cmd) {
     controlAllOff();
     delay(200);
     ESP.restart();
+  } else if (int r = identityCommand(cmd)) {
+    if (r == 2) {
+      controlAllOff();
+      delay(200);
+      ESP.restart();
+    }
   } else if (cmd[0]) {
     Serial.printf("Khong hieu lenh '%s'\n", cmd);
     printHelp();
@@ -62,10 +73,14 @@ static void serialLoop() {
     if (ch == '\r') continue;
     if (ch == '\n') {
       serialLine[serialLen] = 0;
-      runSerialCommand(serialLine);
+      if (serialOverflow) Serial.println("Dong lenh qua dai (>158 ky tu), da bo qua.");
+      else runSerialCommand(serialLine);
       serialLen = 0;
+      serialOverflow = false;
     } else if (serialLen < sizeof(serialLine) - 1) {
       serialLine[serialLen++] = ch;
+    } else {
+      serialOverflow = true;
     }
   }
 }
@@ -76,6 +91,7 @@ void setup() {
   delay(200);
   Serial.printf("\n== Node 1 dieu khien · fw %s · hw %s ==\n", FW_VERSION, HW_VERSION);
   configBegin();
+  identityBegin();           // trước netBegin(): net dùng ident.*
   controlLoadMode();
   configPrint();
   sensorsBegin();

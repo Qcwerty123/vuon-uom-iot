@@ -15,10 +15,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
-from . import commands, errors, ingest, jobs, realtime, seed, telegram  # noqa: F401 — commands đăng ký xử lý ack
+from . import commands, diagnosis, errors, ingest, jobs, realtime, seed, telegram  # noqa: F401 — commands đăng ký xử lý ack
 from .config import REPO, settings
 from .db import engine
-from .routers import admin, alerts, auth, control, devices, telemetry
+from .routers import admin, alerts, auth, control, device_api, devices, diagnoses, gardens, telemetry
 
 
 def _setup_logging() -> None:
@@ -39,6 +39,17 @@ _setup_logging()
 log = logging.getLogger("app")
 
 
+def _migrate() -> None:
+    """Nâng cấp nhỏ, chạy lặp lại được, cho CSDL dựng trước khi đổi 01_schema.sql (không cần reset-db)."""
+    stmts = ["ALTER TABLE diagnoses ADD COLUMN IF NOT EXISTS lamp_on BOOLEAN"]   # v1.4 §6.11
+    for sql in stmts:
+        try:
+            with engine.begin() as c:
+                c.execute(text(sql))
+        except Exception as e:  # noqa: BLE001 — không chặn khởi động, chỉ báo
+            log.warning("Không áp được nâng cấp CSDL '%s': %s", sql, e)
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     if not settings.jwt_secret or len(settings.jwt_secret) < 32:
@@ -46,13 +57,16 @@ async def lifespan(_app: FastAPI):
     realtime.bind_loop(asyncio.get_running_loop())
     with engine.connect() as c:
         c.execute(text("select 1"))
+    _migrate()
     seed.run()
     ingest.start()
     jobs.start()
+    diagnosis.start()
     telegram.start_bot()
     schemes = list(_app.openapi().get("components", {}).get("securitySchemes", {}))
     log.info("Backend đã khởi động (OpenAPI security: %s)", schemes)
     yield
+    diagnosis.stop()
     jobs.stop()
     ingest.stop()
     log.info("Backend dừng")
@@ -81,14 +95,18 @@ api.include_router(telemetry.router)
 api.include_router(control.router)
 api.include_router(alerts.router)
 api.include_router(admin.router)
+api.include_router(diagnoses.router)
+api.include_router(gardens.router)
 
 
 @api.get("/health", tags=["system"])
 def health():
-    return {"status": "ok", "mqtt": bool(ingest._client and ingest._client.is_connected()), "ingest": ingest.stats}
+    return {"status": "ok", "mqtt": bool(ingest._client and ingest._client.is_connected()), "ingest": ingest.stats,
+            "ai": diagnosis.state}
 
 
 app.include_router(api)
+app.include_router(device_api.router)   # /device-api/v1/images — Node 2, Basic auth (§8.9)
 
 
 @app.websocket("/ws")

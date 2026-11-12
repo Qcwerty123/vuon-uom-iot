@@ -10,6 +10,8 @@ import threading
 import time
 import urllib.parse
 import urllib.request
+import uuid
+from pathlib import Path
 
 from .config import settings
 
@@ -39,6 +41,37 @@ def send(chat_id: str, text: str) -> bool:
                 return True
         except Exception as e:  # noqa: BLE001
             log.warning("Gửi Telegram lỗi (lần %d): %s", attempt + 1, e)
+        time.sleep(2 * (attempt + 1))
+    return False
+
+
+def _call_multipart(method: str, fields: dict, file_field: str, path, timeout: float = 30) -> dict:
+    boundary = uuid.uuid4().hex
+    parts = []
+    for k, v in fields.items():
+        parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode())
+    parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{file_field}"; filename="image.jpg"\r\n'
+                 f"Content-Type: image/jpeg\r\n\r\n".encode() + Path(path).read_bytes() + b"\r\n")
+    parts.append(f"--{boundary}--\r\n".encode())
+    req = urllib.request.Request(API.format(token=settings.telegram_token, method=method), data=b"".join(parts),
+                                 headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read())
+
+
+def send_photo(chat_id: str, path, caption: str) -> bool:
+    """sendPhoto multipart, thử 3 lần như send(). Lỗi mạng (Telegram bị chặn) chỉ ghi log, không ném lỗi."""
+    if not enabled():
+        return False
+    if not Path(path).is_file():
+        log.warning("Không có file ảnh để gửi Telegram: %s", Path(path).name)
+        return False
+    for attempt in range(3):
+        try:
+            if _call_multipart("sendPhoto", {"chat_id": chat_id, "caption": caption[:1024]}, "photo", path).get("ok"):
+                return True
+        except Exception as e:  # noqa: BLE001 — không log URL (có token)
+            log.warning("Gửi ảnh Telegram lỗi (lần %d): %s: %s", attempt + 1, type(e).__name__, str(e)[:120])
         time.sleep(2 * (attempt + 1))
     return False
 
