@@ -46,10 +46,7 @@ def repo_path(rel: str) -> Path:
 MODE = get("AI_MODE", "model").strip().lower()          # model | stub
 MODEL_DIR = repo_path(get("AI_MODEL_DIR", "runtime/ai/models"))
 CONF_UNKNOWN = float(get("AI_CONF_UNKNOWN", "0.6"))
-# Tùy chọn NGOÀI đặc tả, mặc định tắt (0): nếu tổng xác suất các lớp Tomato___* của mô hình gốc < ngưỡng này
-# thì gán UNKNOWN (ô đất/khay bị mô hình coi là cây khác). Xem báo cáo WP-07 mục "Lệch đặc tả".
-MIN_TOMATO_MASS = float(get("AI_MIN_TOMATO_MASS", "0"))
+MODEL_VERSION = get("AI_MODEL_VERSION", "convnext-t-leaf-v1")
 LOG_DIR = repo_path(get("LOG_DIR", "logs/services"))
-MANIFEST = SERVICE_DIR / "model.json"
 LABEL_MAP = SERVICE_DIR / "label_map.json"
-MAX_IMAGE_BYTES = 2_000_000   # chỉ backend gọi (ảnh ≤ 300 KB); chặn đầu vào bất thường
+MAX_IMAGE_BYTES = 5_000_000   # chỉ backend gọi (ảnh ≤ 300 KB); chặn đầu vào bất thường

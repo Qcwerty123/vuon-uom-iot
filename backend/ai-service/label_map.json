@@ -1,27 +1,13 @@
 {
-  "_ghi_chu": "Gộp nhãn gốc về 3 lớp — đặc tả §15.2. Khóa nhóm 'plantvillage' khớp đúng tên lớp của mô hình trong model.json (chú ý 'Tomato___Healthy' viết hoa H). Nhóm rà lại sau khi xem ảnh thật (C8).",
-  "classes": ["HEALTHY", "YELLOW", "SPOT"],
-  "unknown_threshold": 0.6,
-  "plantvillage": {
-    "Tomato___Healthy": "HEALTHY",
-    "Tomato___Tomato_Yellow_Leaf_Curl_Virus": "YELLOW",
-    "Tomato___Leaf_Mold": "YELLOW",
-    "Tomato___Spider_mites Two-spotted_spider_mite": "YELLOW",
-    "Tomato___Tomato_mosaic_virus": "YELLOW",
-    "Tomato___Bacterial_spot": "SPOT",
-    "Tomato___Early_blight": "SPOT",
-    "Tomato___Late_blight": "SPOT",
-    "Tomato___Septoria_leaf_spot": "SPOT",
-    "Tomato___Target_Spot": "SPOT"
+  "_ghi_chu": "Luồng mới (MobileSAM tách lá + ConvNeXt-Tiny). Mô hình có 4 lớp; hợp đồng /v1/infer chỉ có 3 nhãn + UNKNOWN nên PEST được cộng vào SPOT. Thứ tự lớp thật đọc từ runtime/ai/models/model_meta.json; bản này là mặc định + tài liệu. Hằng số tương ứng nằm trong app/leaf_pipeline.py.",
+  "model_classes": ["HEALTHY", "SPOT", "YELLOW", "PEST"],
+  "map": {
+    "HEALTHY": "HEALTHY",
+    "SPOT": "SPOT",
+    "YELLOW": "YELLOW",
+    "PEST": "SPOT"
   },
-  "plantdoc": {
-    "Tomato leaf": "HEALTHY",
-    "Tomato leaf yellow virus": "YELLOW",
-    "Tomato mold leaf": "YELLOW",
-    "Tomato leaf mosaic virus": "YELLOW",
-    "Tomato leaf bacterial spot": "SPOT",
-    "Tomato Early blight leaf": "SPOT",
-    "Tomato leaf late blight": "SPOT",
-    "Tomato Septoria leaf spot": "SPOT"
-  }
+  "output_labels": ["HEALTHY", "YELLOW", "SPOT", "UNKNOWN"],
+  "unknown_threshold": 0.6,
+  "alert_threshold_backend": 0.6
 }

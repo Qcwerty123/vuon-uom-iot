@@ -105,10 +105,13 @@ if ($NoAi) {
     Write-Log "AI service: Đang chạy trên cổng $aiPort." "INFO"
 } else {
     $aiMode = if ($env:AI_MODE) { $env:AI_MODE } else { "model" }
-    $manifest = Get-Content -Raw -Encoding UTF8 (Join-Path $aiDir "model.json") | ConvertFrom-Json
     $modelDir = Get-RepoPath $(if ($env:AI_MODEL_DIR) { $env:AI_MODEL_DIR } else { "runtime/ai/models" })
-    if ($aiMode -ne "stub" -and -not (Test-Path (Join-Path $modelDir $manifest.file))) {
-        Write-Log "AI service: chưa có trọng số $($manifest.file). Chạy .\scripts\windows\get-model.ps1 (AI sẽ báo no_model)." "WARN"
+    if ($aiMode -ne "stub") {
+        foreach ($f in @("mobile_sam.pt", "leaf.onnx")) {
+            if (-not (Test-Path (Join-Path $modelDir $f))) {
+                Write-Log "AI service: thiếu $f trong $modelDir (AI sẽ báo no_model, xem backend/ai-service/README.md)." "WARN"
+            }
+        }
     }
     $py = Ensure-Venv $aiDir
     if ($py) {

@@ -1,82 +1,101 @@
-# AI service — chẩn đoán lá theo lưới 3×3
+# AI service — chẩn đoán lá mồng tơi
 
-Đặc tả: `docs/dac-ta-he-thong.md` §15 (tích hợp §15.6). Chạy trên máy chủ Windows tại **127.0.0.1:8001**, chỉ backend gọi.
+Đặc tả gốc: `docs/dac-ta-he-thong.md` §15 (xem mục "Lệch đặc tả" bên dưới: đặc tả vẫn ghi cà chua/MobileNetV2).
 
-## Mô hình (C24 — tiền huấn luyện công khai, không tự huấn luyện)
+## Luồng xử lý
 
-| Mục | Giá trị |
-|---|---|
-| `model_version` | `mnv2-pv38-hassan-v1` |
-| Tên | Plant Disease Detector — MobileNetV2 fine-tuned (Keras 3) |
-| Tác giả | S.M Hassan (Muhammad-Hassan12) |
-| Nguồn | <https://huggingface.co/rarfileexe/Plant-Disease-Detector> · mã: <https://github.com/Muhammad-Hassan12/Plant-Disease-Detector> |
-| Giấy phép | **MIT** (thẻ model card + file LICENSE của repo GitHub) |
-| Dữ liệu huấn luyện | PlantVillage (bản Augmented, ~87 000 ảnh, 38 lớp, 14 loài; có 10 lớp Tomato). Tác giả báo test accuracy 98,75 % trên tập test của dataset |
-| Link tải trọng số | <https://huggingface.co/rarfileexe/Plant-Disease-Detector/resolve/main/model_4_mobilenet_finetuned.keras> (24 MB) |
-| SHA256 | `08f285aff6d9e1ab88d4d5b2269f1cc977714003755f8553887edbf8691b325f` |
-| Đầu vào | RGB 224×224, giá trị 0..255 (mô hình tự chuẩn hóa `x/127.5 − 1` bên trong) |
+```
+ảnh khay (Node 2, 800×600)
+  └─ crop_box? ──► cắt vùng khay
+       └─ MobileSAM: tìm điểm gợi ý từ màu lá (HSV) + distance transform → SamPredictor tinh chỉnh từng lá
+            └─ mỗi lá: cắt theo mask, nền ngoài lá xám 128, đệm vuông, resize 224×224, chuẩn hóa ImageNet, RGB
+                 └─ ConvNeXt-Tiny (ONNX): HEALTHY / SPOT / YELLOW / PEST
+                      └─ gộp PEST vào SPOT; xác suất lớn nhất < AI_CONF_UNKNOWN (0,6) → UNKNOWN
+                           └─ lá gán vào ô 3×3 chứa tâm của nó (active_tiles lọc ô)
+                                └─ nhãn ô: lá bệnh (SPOT/YELLOW) conf cao nhất; không có thì lá HEALTHY kém chắc nhất; không có lá = UNKNOWN, conf 0
+```
 
-Toàn bộ thông tin trên nằm trong `model.json` (kèm danh sách 38 lớp đúng thứ tự đầu ra). Trọng số **không commit**, đặt ở `runtime/ai/models/plant-disease-mnv2-pv38.keras`:
+API (chỉ nghe `127.0.0.1:8001`, chỉ backend gọi):
+
+- `POST /v1/infer` — multipart: `image`, `crop_box?` (JSON `[x0,y0,x1,y1]`, pixel hoặc tỉ lệ 0..1), `active_tiles?` (JSON `[[r,c],...]`).
+  Trả về đúng §15.6 (`model_version`, `tiles` đủ 9 ô, `top_label`, `top_confidence`, `latency_ms`), **thêm 2 trường**: `n_leaves` trong mỗi ô và mảng `leaves` (`tile [r,c]`, `label`, `conf`, `bbox [x,y,w,h]` theo pixel ảnh gốc, `polygon` chuẩn hóa 0–1 theo vùng đã cắt).
+  Lỗi: 400 (ảnh/`crop_box`/`active_tiles` sai), 413 (> 5 MB), 503 (thiếu mô hình; thông báo nêu file nào thiếu và đặt ở đâu).
+- `GET /v1/health` — `{"status":"ok","model_version":...}` hoặc `{"status":"no_model","model_version":null}`. Thiếu file thì service vẫn khởi động.
+- Log: `logs/services/ai-service.log` (độ trễ, số lá; không ghi nội dung ảnh).
+
+## Cài đặt và chạy
 
 ```powershell
-.\scripts\windows\get-model.ps1        # tải + kiểm SHA256
+.\scripts\windows\start.ps1        # Ensure-Venv cài backend/ai-service/requirements.txt rồi chạy uvicorn app.main:app
 ```
 
-## Cách suy luận
+`requirements.txt` có dòng `mobile_sam @ git+https://github.com/ChaoningZhang/MobileSAM.git`; uv xử lý được (đã thử), **cần `git` trong PATH và mạng** lần cài đầu (torch + torchvision + timm khoảng vài trăm MB). Nếu mạng/git bị chặn, cài tay: `.venv\Scripts\python.exe -m pip install "git+https://github.com/ChaoningZhang/MobileSAM.git"` (hoặc `uv pip install --python .venv\Scripts\python.exe ...`). Chạy tay: `cd backend/ai-service; .venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8001`.
 
-1. Mở ảnh, cắt `crop_box` nếu có (JSON `[x0, y0, x1, y1]` theo pixel; cả 4 số trong 0..1 thì hiểu là tỉ lệ).
-2. Chia lưới 3×3, mỗi ô resize 224×224 (`app/preprocess.py`).
-3. Chạy mô hình theo lô các ô thuộc `active_tiles` (JSON `[[r, c], ...]`; không gửi = cả 9 ô). Ô ngoài `active_tiles` → `UNKNOWN`, `conf = 0`.
-4. **Gộp nhãn:** chỉ lấy xác suất 10 lớp `Tomato___*`, chuẩn hóa lại tổng = 1, cộng theo `label_map.json` về `HEALTHY` / `YELLOW` / `SPOT`.
-5. Xác suất lớn nhất < `AI_CONF_UNKNOWN` (0,6) → `UNKNOWN`.
-6. `top_label`: ô YELLOW/SPOT có độ tin cậy cao nhất; không có thì HEALTHY cao nhất; không có nữa thì UNKNOWN.
+Biến `.env`: `AI_URL`, `AI_MODEL_DIR` (mặc định `runtime/ai/models`), `AI_CONF_UNKNOWN` (0,6), `AI_MODEL_VERSION` (mặc định `convnext-t-leaf-v1`), `AI_MODE=stub` (xem dưới). `AI_CONF_ALERT` (0,6) **do backend dùng**, service không đọc.
 
-Mỗi ô có thêm `tomato_mass` = tổng xác suất các lớp Tomato **trước** khi chuẩn hóa lại (để đánh giá độ lệch miền). Tùy chọn ngoài đặc tả `AI_MIN_TOMATO_MASS` (mặc định 0 = tắt): đặt ví dụ `0.5` trong `.env` thì ô có `tomato_mass` thấp hơn bị gán UNKNOWN.
+## File mô hình (KHÔNG commit) — đặt ở `runtime/ai/models/`
 
-## API
+| File | Nguồn |
+|---|---|
+| `mobile_sam.pt` (40,7 MB) | https://raw.githubusercontent.com/ChaoningZhang/MobileSAM/master/weights/mobile_sam.pt |
+| `leaf.onnx` | Train trên Kaggle: ConvNeXt-Tiny (`convnext_tiny.fb_in22k_ft_in1k`, timm), đầu vào `1×3×224×224` chuẩn hóa ImageNet, đầu ra logits 4 lớp theo thứ tự **HEALTHY, SPOT, YELLOW, PEST**. Tiền xử lý lúc train phải giống `crop_leaf()` trong `app/leaf_pipeline.py` (cắt theo mask, nền xám 128, đệm vuông, resize 224, KHÔNG cắt giữa). |
+| `model_meta.json` (tùy chọn) | `{"classes": [...], "input": [224,224], "mean": [...], "std": [...]}`. Có thì thứ tự lớp đọc từ đây; số lớp phải bằng đầu ra ONNX, sai thì service báo lỗi rõ ràng (health `no_model`, lý do ở trường `reason`). |
 
-```
-POST /v1/infer   multipart: image (JPEG), crop_box?, active_tiles?
-→ 200 {"model_version":"mnv2-pv38-hassan-v1",
-       "tiles":[{"r":0,"c":0,"label":"HEALTHY","conf":0.97,"probs":{"HEALTHY":0.97,"YELLOW":0.02,"SPOT":0.01},
-                 "tomato_mass":0.99}, ... 9 ô],
-       "top_label":"HEALTHY","top_confidence":0.99,"latency_ms":650}
-   400 ảnh/tham số sai · 503 chưa nạp mô hình (backend giữ bản ghi QUEUED)
-GET /v1/health → {"status":"ok","model_version":"...","mode":"model"} | {"status":"no_model","reason":"..."}
-```
-
-## Chạy
+## Thử bằng mô hình giả (khi chưa có leaf.onnx thật)
 
 ```powershell
-.\scripts\windows\start.ps1           # bật PostgreSQL → Mosquitto → AI service → backend (-NoAi để bỏ AI)
-.\scripts\windows\status.ps1          # dòng "AI Service" hiện model_version
-.\scripts\windows\stop.ps1 -OnlyAi    # chỉ dừng AI service
+.venv\Scripts\python.exe scripts\make_dummy_model.py <thư_mục_đích>   # tạo leaf.onnx NGẪU NHIÊN
 ```
 
-Môi trường: `backend/ai-service/.venv` do `Ensure-Venv` tạo (uv + Python 3.11 trong `tools/`), thư viện trong `requirements.txt` (TensorFlow 2.20 CPU, ~600 MB). Log: `logs/services/ai-service.log` (và `ai-service-console.log`).
+Nhãn của mô hình giả vô nghĩa, **không dùng cho demo**. Script từ chối ghi đè nếu đích đã có `leaf.onnx`. Test tự động (dùng mô hình giả trong thư mục tạm, chỉ kiểm tra luồng):
 
-Biến `.env`: `AI_URL`, `AI_MODEL_DIR` (mặc định `runtime/ai/models`), `AI_CONF_UNKNOWN`, `AI_MODE`, `AI_MIN_TOMATO_MASS`.
+```powershell
+.venv\Scripts\python.exe tests\test_infer.py     # hoặc pytest tests
+```
 
-### Chế độ stub (`AI_MODE=stub`) — KHÔNG phải mô hình thật
+Xem kết quả bằng mắt: `.venv\Scripts\python.exe scripts\viz_infer.py khay.jpg ket_qua.jpg [--url http://127.0.0.1:8001/v1/infer]` (vẽ viền + nhãn từng lá; lưu ảnh kết quả vào `runtime/`, không commit).
 
-Dùng để kiểm thử luồng khi chưa có trọng số / TensorFlow. Kết quả tất định theo màu (HSV): ô có ≥ 25 % pixel vàng → YELLOW, ≥ 12 % pixel nâu sẫm → SPOT, ≥ 20 % pixel xanh lá → HEALTHY, còn lại → UNKNOWN. `model_version = stub-v0`. `test-backend.ps1 -Wp 07` tự bật AI ở chế độ này.
+`AI_MODE=stub`: bộ chấm theo màu (`model_version=stub-v0`), KHÔNG phải mô hình thật; `test-backend.ps1 -Wp 07` dùng chế độ này. Stub không tách lá (`leaves` rỗng).
 
-## Độ trễ đo được (CPU laptop, Windows 11, TensorFlow 2.20)
+## Chất lượng mô hình
 
-| Mục | Kết quả |
-|---|---|
-| Nạp mô hình khi khởi động | ~19 s |
-| Một ảnh 800×600, 9 ô (đo trong `/v1/infer`) | 590–820 ms (mục tiêu < 3 s) |
-| Stub | ~40–60 ms |
+Đo trên tập test 451 ảnh lá của dataset (lá trên nền xám, mức tốt nhất, **không phải ảnh Node 2**):
 
-## Giới hạn (độ lệch miền)
+| | accuracy | macro-F1 | HEALTHY | SPOT | YELLOW | PEST |
+|---|---|---|---|---|---|---|
+| 4 lớp | 0,749 | 0,704 | 0,859 | 0,711 | 0,684 | 0,560 |
+| 3 lớp (PEST→SPOT) | 0,840 | 0,798 | 0,859 | 0,850 | 0,684 | — |
 
-PlantVillage là ảnh **một lá** trên nền đồng màu chụp trong phòng thí nghiệm; ảnh Node 2 là khay cây nhìn từ trên, ESP32-CAM, nhiều lá + đất. Khi thử với ảnh khay vẽ giả: ô chỉ có đất bị gán YELLOW ~0,8 vì bước "chuẩn hóa lại trên các lớp Tomato" ép mọi ô thành cà chua (`tomato_mass` chỉ 0,2–0,5). Cần cấu hình `active_tiles` cho đúng khay và đánh giá trên ảnh thật của nhóm (§15.1) trước khi tin kết quả. Các giai đoạn huấn luyện PlantDoc / ảnh tự chụp (§15.5) là hướng phát triển (`requirements-train.txt`).
+(F1 theo lớp.) Nhầm lẫn chủ yếu SPOT↔PEST, hai lớp được gộp khi chạy thật.
 
-## Dữ liệu cho hướng phát triển (tự tải, không commit)
+Theo ngưỡng độ tin cậy (từng ảnh; nhãn bệnh = SPOT/YELLOW gộp):
 
-| Nguồn | Đặt vào |
-|---|---|
-| PlantVillage (các lớp Tomato) | `runtime/ai/data/plantvillage/` |
-| PlantDoc (các lớp Tomato) | `runtime/ai/data/plantdoc/` |
-| Ảnh tự chụp bằng Node 2 (chia theo khay và ngày, §15.3) | `runtime/ai/data/own/` |
+| Ngưỡng | Phủ | Đúng/phủ | Báo nhầm lá khỏe | Bỏ sót lá bệnh |
+|---|---|---|---|---|
+| 0,5 | 93 % | 85,5 % | 15,7 % | 12,4 % |
+| **0,6 (đã chọn)** | 75 % | 90,3 % | 8,1 % | 24,9 % |
+| 0,8 | 37 % | 94,6 % | 2,9 % | 49,4 % |
+
+Hạn chế: ảnh Node 2 mờ hơn và lá chồng nhau nên điểm thực tế sẽ thấp hơn; các lá cùng một cây có thể nằm cả ở train lẫn test (rò rỉ); lớp YELLOW chỉ 240 ảnh (36 ảnh test). **Điểm báo cáo cuối phải đo trên ảnh Node 2 của nhóm.**
+
+Tốc độ đo trên máy này (CPU, Windows 11): ảnh khay giả 800×600 có 9 lá rời → ~2,1 s mỗi ảnh (`latency_ms` 2064–2093), nạp mô hình khi khởi động vài giây.
+
+## Giới hạn đã biết
+
+- Lọc lá theo màu (hue 15–95): lá nâu/héo nhiều có thể bị bỏ sót.
+- Lá nhỏ hơn 0,4 % diện tích ảnh bị bỏ (`min_frac`); tối đa 30 lá (lấy 30 lá lớn nhất).
+- Lá chồng nhau: lá bị che chỉ có khung phần nhìn thấy (thử trên ảnh giả: 9/9 lá rời, 7/8 lá chồng).
+- `SamAutomaticMaskGenerator` đã bỏ: chậm (44 s/ảnh, CPU 2 nhân) và gộp nhiều lá thành một mask.
+- Điểm âm cho SAM chỉ lấy tối đa 3 lá lân cận; phải giữ vùng liền lớn nhất của mask.
+- Mô hình chỉ học mồng tơi; ảnh không có lá cho 9 ô UNKNOWN, conf 0.
+
+## Lệch đặc tả (không sửa đặc tả)
+
+§15 vẫn ghi cà chua / MobileNetV2 / PlantVillage, 3 lớp huấn luyện, ngưỡng cảnh báo 0,8. Hiện là: mồng tơi, MobileSAM + ConvNeXt-Tiny, 4 lớp gộp thành 3, ngưỡng UNKNOWN và AI_LEAF đều 0,6. `crop_box` giữ quy ước hiện có của backend: `[x0,y0,x1,y1]`.
+
+## Nguồn và giấy phép
+
+- Dữ liệu huấn luyện: IDDMSLD, Sayeem và cộng sự, Mendeley Data V2, doi:10.17632/sy69db2nz5.2 — CC BY 4.0.
+- MobileSAM: https://github.com/ChaoningZhang/MobileSAM — Apache-2.0 (đã kiểm tra file LICENSE).
+- ConvNeXt: qua thư viện timm (https://github.com/huggingface/pytorch-image-models, Apache-2.0); trọng số khởi tạo `convnext_tiny.fb_in22k_ft_in1k`.
+- Tệp `model.json`, `requirements-train.txt` và `scripts/windows/get-model.ps1` là của luồng Keras/PlantVillage cũ, không còn dùng.
