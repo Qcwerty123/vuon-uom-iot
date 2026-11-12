@@ -1,14 +1,7 @@
-"""Bộ suy luận: mô hình thật (Keras, PlantVillage 38 lớp) hoặc stub theo màu (AI_MODE=stub).
-
-Cả hai trả về, cho mỗi ô, xác suất đã gộp về 3 lớp {HEALTHY, YELLOW, SPOT} (tổng = 1) và thông tin phụ.
-Việc gán UNKNOWN theo ngưỡng làm ở main.py để dùng chung cho hai chế độ.
-"""
+"""Bộ suy luận: luồng thật MobileSAM + ConvNeXt (LeafEngine) hoặc stub theo màu (AI_MODE=stub, chỉ để kiểm thử)."""
 from __future__ import annotations
 
-import hashlib
-import json
 import logging
-import os
 import time
 
 import numpy as np
@@ -20,80 +13,40 @@ log = logging.getLogger("ai.engine")
 CLASSES = ("HEALTHY", "YELLOW", "SPOT")
 
 
-def _sha256(path) -> str:
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
-
-
-class KerasEngine:
-    """Mô hình tiền huấn luyện công khai (C24). Chỉ lấy các lớp Tomato___*, chuẩn hóa lại tổng = 1, gộp theo label_map."""
+class LeafEngine:
+    """Luồng thật: MobileSAM tách lá -> ConvNeXt-Tiny (ONNX) phân loại -> gộp về lưới 3x3 (leaf_pipeline.py)."""
 
     kind = "model"
 
     def __init__(self) -> None:
         self.ready = False
         self.reason = ""
-        man = json.loads(config.MANIFEST.read_text(encoding="utf-8"))
-        self.model_version = man["model_version"]
-        self.classes: list[str] = man["classes"]
-        self.path = config.MODEL_DIR / man["file"]
-        self.sha256 = man.get("sha256", "")
-        lm = json.loads(config.LABEL_MAP.read_text(encoding="utf-8"))["plantvillage"]
-        self.tomato_idx = [i for i, n in enumerate(self.classes) if n.startswith("Tomato___")]
-        missing = [self.classes[i] for i in self.tomato_idx if self.classes[i] not in lm]
-        if missing:
-            raise RuntimeError(f"label_map.json thiếu lớp: {missing}")
-        # Ma trận gộp: (số lớp Tomato) × 3
-        self.merge = np.zeros((len(self.tomato_idx), len(CLASSES)), dtype=np.float32)
-        for j, i in enumerate(self.tomato_idx):
-            self.merge[j, CLASSES.index(lm[self.classes[i]])] = 1.0
-        self.model = None
+        self.model_version = config.MODEL_VERSION
+        self.pipe = None
+
+    def missing_files(self) -> list[str]:
+        return [f for f in ("mobile_sam.pt", "leaf.onnx") if not (config.MODEL_DIR / f).exists()]
 
     def load(self) -> None:
-        if not self.path.exists():
-            self.reason = f"thiếu trọng số {self.path.name} trong {config.MODEL_DIR} (chạy scripts/windows/get-model.ps1)"
+        miss = self.missing_files()
+        if miss:
+            self.reason = (f"Thiếu file mô hình: {', '.join(miss)}. Đặt vào thư mục {config.MODEL_DIR} "
+                           f"(xem backend/ai-service/README.md).")
             log.warning(self.reason)
             return
-        if self.sha256 and _sha256(self.path) != self.sha256:
-            self.reason = f"SHA256 của {self.path.name} không khớp model.json"
-            log.error(self.reason)
-            return
+        from . import leaf_pipeline  # noqa: PLC0415 — nạp chậm (torch), stub không cần
+        from .leaf_pipeline import LeafPipeline  # noqa: PLC0415
+
+        leaf_pipeline.UNKNOWN_T = config.CONF_UNKNOWN   # .env cũng được đọc (config.py)
+
         t0 = time.time()
-        os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
-        os.environ.setdefault("KERAS_BACKEND", "tensorflow")
-        import keras  # noqa: PLC0415 — nạp chậm, stub không cần TensorFlow
-
-        self.model = keras.saving.load_model(self.path, compile=False)
-        out = int(self.model.output_shape[-1])
-        if out != len(self.classes):
-            self.reason = f"mô hình có {out} lớp, model.json ghi {len(self.classes)}"
-            log.error(self.reason)
-            self.model = None
-            return
-        self.predict(np.zeros((1, 224, 224, 3), dtype=np.float32))  # khởi động đồ thị
+        self.pipe = LeafPipeline(config.MODEL_DIR / "mobile_sam.pt", config.MODEL_DIR / "leaf.onnx",
+                                 config.MODEL_DIR / "model_meta.json")
         self.ready = True
-        log.info("Đã nạp mô hình %s trong %.1f s", self.model_version, time.time() - t0)
+        log.info("Đã nạp mô hình %s (lớp %s) trong %.1f s", self.model_version, self.pipe.classes, time.time() - t0)
 
-    def predict(self, batch: np.ndarray) -> np.ndarray:
-        return np.asarray(self.model(batch, training=False))
-
-    def infer(self, tiles: list[Image.Image]) -> list[dict]:
-        batch = np.stack([np.asarray(t, dtype=np.float32) for t in tiles])
-        p = self.predict(batch)                          # (n, 38) softmax
-        tom = p[:, self.tomato_idx]
-        mass = tom.sum(axis=1, keepdims=True)
-        tom = tom / np.clip(mass, 1e-9, None)            # chỉ trong các lớp cà chua, tổng = 1
-        agg = tom @ self.merge                           # (n, 3)
-        out = []
-        for k in range(len(tiles)):
-            j = int(np.argmax(tom[k]))
-            out.append({"probs": {c: float(agg[k, i]) for i, c in enumerate(CLASSES)},
-                        "tomato_mass": float(mass[k, 0]),
-                        "raw_top": self.classes[self.tomato_idx[j]]})
-        return out
+    def infer_image(self, bgr, crop_box, active):
+        return self.pipe.infer(bgr, crop_box, active)
 
 
 class StubEngine:
@@ -147,4 +100,4 @@ class StubEngine:
 def create():
     if config.MODE == "stub":
         return StubEngine()
-    return KerasEngine()
+    return LeafEngine()
