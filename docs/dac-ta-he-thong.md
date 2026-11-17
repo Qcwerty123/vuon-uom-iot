@@ -941,7 +941,7 @@ Content-Type: image/jpeg
 X-Captured-At: 1793421000000
 X-Trigger: schedule | command
 X-Cmd-Id: 6f1c2a9e-...        (khi chụp theo lệnh)
-Body: JPEG ≤ 300 KB
+Body: JPEG ≤ 1 MB
 ```
 
 Thiết bị gọi `http://192.168.137.1:8000/device-api/v1/images`. Backend FastAPI phục vụ thẳng, không qua proxy (C15). Kênh này cùng mức bảo mật với MQTT 1883 (§14.2).
@@ -982,7 +982,7 @@ Backend xác thực bằng bcrypt so với `credential_hash`, có cache kết qu
 | CommandTimeout | 2 s | Lệnh PENDING quá 10 s → TIMEOUT, đẩy WS |
 | ConfigRetry | 30 s | Cấu hình chưa có ack sau 60 s mà thiết bị đang online → publish lại (retain) |
 | HourlyRollup | đầu mỗi giờ | Tổng hợp min/max/avg/count giờ trước vào `telemetry_hourly` |
-| Retention | 03:00 hằng ngày | Xóa telemetry thô > 30 ngày, ảnh > 14 ngày (trừ ảnh đã xác nhận), refresh token hết hạn |
+| Retention | 03:00 hằng ngày | Xóa telemetry thô > 45 ngày, ảnh > 45 ngày (trừ ảnh đã xác nhận), refresh token hết hạn |
 | DiagnosisWorker | liên tục | Lấy diagnosis QUEUED → gọi AI → lưu → áp luật (§15.6). Khởi động lại thì quét lại các bản QUEUED/RUNNING |
 | FaultDetector | 60 s | `sensor_fault` kéo dài > 5 phút mà chưa có `sensor_ok` → thiết bị Active chuyển Fault |
 
@@ -1606,7 +1606,7 @@ Bổ sung:
 | Username, họ tên, email | Đăng nhập, liên hệ | Chỉ ADMIN và bản thân xem |
 | Telegram chat id | Gửi cảnh báo | Chỉ bản thân và ADMIN |
 | IP, user agent trong audit/phiên | An ninh | Chỉ ADMIN; xóa sau 90 ngày |
-| Ảnh khay cây | Chẩn đoán | Không chụp người; chỉ người được gán xem; xóa sau 14 ngày (trừ ảnh đã xác nhận dùng cho huấn luyện) |
+| Ảnh khay cây | Chẩn đoán | Không chụp người; chỉ người được gán xem; xóa sau 45 ngày (trừ ảnh đã xác nhận dùng cho huấn luyện) |
 
 Seed và demo không dùng dữ liệu cá nhân thật.
 

@@ -1,12 +1,13 @@
 // Ảnh và chẩn đoán (đặc tả §10.9, §15, §16.1). API thuộc WP-07: hiện chạy bằng dữ liệu giả (config.js MOCK.diagnoses).
-import { useCallback, useEffect, useState } from 'react'
-import { get, getBlob, post } from '../api/client.js'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { get, getBlob, post, postFile } from '../api/client.js'
 import { canControl, useAuth } from '../auth.jsx'
 import { useDevices } from '../devices.jsx'
 import { navigate } from '../router.js'
 import { Badge, Card, Empty, ErrorBox, Spinner, StatusBadge, useRealtime, useToast } from '../components/ui.jsx'
 import { MOCK } from '../config.js'
 import ImageViewer from '../components/ImageViewer.jsx'
+import LeafOverlay, { cropRegion } from '../components/LeafOverlay.jsx'
 import { DIAG_STATUS, LEAF, fmtTime } from '../labels.js'
 
 export default function Diagnoses({ query }) {
@@ -19,6 +20,9 @@ export default function Diagnoses({ query }) {
   const [selected, setSelected] = useState(null)
   const [error, setError] = useState(null)
   const [label, setLabel] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const fileRef = useRef(null)
+  const toast = useToast()
 
   const load = useCallback(async () => {
     if (!deviceId) return
@@ -34,6 +38,22 @@ export default function Diagnoses({ query }) {
   useRealtime((m) => {
     if ((m.type === 'diagnosis' && m.deviceId === deviceId) || m.type === 'reconnected') load()
   }, [deviceId, load])
+
+  // Tải ảnh từ máy tính lên để thử AI: đi qua hàng đợi AI như ảnh camera nhưng không sinh cảnh báo
+  const upload = async (file) => {
+    if (!file) return
+    setUploading(true)
+    try {
+      const r = await postFile(`/devices/${deviceId}/diagnoses/test-upload`, file)
+      toast('Đã tải ảnh lên, đang phân tích…', 'ok')
+      setError(null)
+      await load()
+      setSelected(r.id)
+    } catch (e) { setError(e) } finally {
+      setUploading(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
 
   return (
     <div className="stack">
@@ -54,6 +74,16 @@ export default function Diagnoses({ query }) {
               {Object.entries(LEAF).map(([k, v]) => <option key={k} value={k}>{v.text}</option>)}
             </select>
           </label>
+          {device && canControl(user, device) && (
+            <span className="row gap-s">
+              <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" hidden
+                onChange={(e) => upload(e.target.files?.[0])} />
+              <button className="btn" disabled={uploading} onClick={() => fileRef.current?.click()}>
+                {uploading ? 'Đang tải…' : 'Tải ảnh lên để thử'}
+              </button>
+              <span className="muted small">Ảnh thử không tạo cảnh báo (JPEG/PNG/WEBP ≤ 12 MB)</span>
+            </span>
+          )}
         </div>
       </Card>
       {loaded && !cameras.length && <Empty>Không có camera nào được gán cho bạn.</Empty>}
@@ -71,6 +101,7 @@ export default function Diagnoses({ query }) {
                         {d.status === 'DONE'
                           ? <Badge tone={(LEAF[d.topLabel] || LEAF.UNKNOWN).tone}>{(LEAF[d.topLabel] || LEAF.UNKNOWN).text}</Badge>
                           : <StatusBadge map={DIAG_STATUS} value={d.status} />}
+                        {d.trigger === 'test' && <Badge tone="muted">ảnh thử</Badge>}
                         {d.reviewVerdict && <Badge tone="muted">{d.reviewVerdict === 'CONFIRMED' ? '✓ đã xác nhận' : '✗ đã báo sai'}</Badge>}
                       </div>
                     </div>
@@ -79,20 +110,22 @@ export default function Diagnoses({ query }) {
               </ul>
             )}
           </Card>
-          {selected && <DiagnosisView id={selected} canReview={canControl(user, device)} onReviewed={load} />}
+          {selected && <DiagnosisView id={selected} status={list?.find((x) => x.id === selected)?.status} canReview={canControl(user, device)} onReviewed={load} />}
         </div>
       )}
     </div>
   )
 }
 
-function DiagnosisView({ id, canReview, onReviewed }) {
+function DiagnosisView({ id, status, canReview, onReviewed }) {
   const toast = useToast()
   const [d, setD] = useState(null)
   const [img, setImg] = useState(null)
   const [imgBytes, setImgBytes] = useState(0)
   const [viewer, setViewer] = useState(false)
   const [cropBox, setCropBox] = useState(null)
+  const [nat, setNat] = useState(null)          // kích thước gốc của ảnh (cần khi crop_box tính bằng pixel)
+  const [mode, setMode] = useState(null)        // 'leaf' = viền từng lá, 'tile' = tô theo ô 3×3; null = tự chọn
   const [error, setError] = useState(null)
   const [correct, setCorrect] = useState('')
   const [note, setNote] = useState('')
@@ -101,7 +134,7 @@ function DiagnosisView({ id, canReview, onReviewed }) {
   useEffect(() => {
     let url = null
     let alive = true
-    setD(null); setImg(null); setError(null); setViewer(false)
+    setD(null); setImg(null); setError(null); setViewer(false); setNat(null); setMode(null)
     get(`/diagnoses/${id}`).then((x) => {
       if (!alive) return
       setD(x)
@@ -114,12 +147,14 @@ function DiagnosisView({ id, canReview, onReviewed }) {
       if (alive) { setImg(url); setImgBytes(b.size || 0) }
     }).catch(() => {})
     return () => { alive = false; if (url) URL.revokeObjectURL(url) }
-  }, [id])
+  }, [id, status])   // status đổi (QUEUED → DONE) thì tải lại để thấy kết quả
 
   if (error) return <Card><ErrorBox error={error} /></Card>
   if (!d) return <Card><Spinner /></Card>
 
   const tiles = d.tiles || []
+  const leaves = d.leaves || []                 // chỉ có ở chẩn đoán từ mô hình tách lá (MobileSAM + ConvNeXt)
+  const view = mode || (leaves.length ? 'leaf' : 'tile')
   const tileAt = (r, c) => tiles.find((t) => t.r === r && t.c === c)
   const abnormal = new Set((d.abnormalTiles || []).map(([r, c]) => `${r}-${c}`))
   const top = LEAF[d.topLabel] || LEAF.UNKNOWN
@@ -143,14 +178,20 @@ function DiagnosisView({ id, canReview, onReviewed }) {
       </span>
     )}>
       {viewer && img && (
-        <ImageViewer src={img} bytes={imgBytes} fileName={`dg-${d.id}.jpg`} cropBox={cropBox}
+        <ImageViewer src={img} bytes={imgBytes} fileName={`dg-${d.id}.jpg`} cropBox={cropBox} leaves={leaves}
           title={`Ảnh #${d.id} · ${fmtTime(d.capturedAt)}`} onClose={() => setViewer(false)} />
       )}
       <div className="diag-view">
         <div className="tray" onClick={() => img && setViewer(true)} style={{ cursor: img ? 'zoom-in' : undefined }}
           title={img ? 'Bấm để xem ảnh gốc' : undefined}>
-          {img ? <img src={img} alt="Ảnh khay cây" /> : <div className="tray-placeholder">Đang tải ảnh…</div>}
-          {d.status === 'DONE' && (
+          {img ? (
+            <img src={img} alt="Ảnh khay cây"
+              onLoad={(e) => setNat({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })} />
+          ) : <div className="tray-placeholder">Đang tải ảnh…</div>}
+          {d.status === 'DONE' && view === 'leaf' && (
+            <LeafOverlay leaves={leaves} region={cropRegion(cropBox, nat)} showText={false} />
+          )}
+          {d.status === 'DONE' && view === 'tile' && (
             <div className="tray-grid">
               {[0, 1, 2].map((r) => [0, 1, 2].map((c) => {
                 const t = tileAt(r, c)
@@ -173,13 +214,33 @@ function DiagnosisView({ id, canReview, onReviewed }) {
                 <Badge tone={top.tone}>Kết luận: {top.text}</Badge>
                 <Badge tone="muted">Độ tin cậy {Math.round((d.topConfidence || 0) * 100)}%</Badge>
                 {abnormal.size > 0 && <Badge tone="warn">{abnormal.size} ô bất thường</Badge>}
+                {leaves.length > 0 && <Badge tone="muted">{leaves.length} lá</Badge>}
               </div>
+              {leaves.length > 0 && (
+                <div className="row gap-s wrap" role="group" aria-label="Kiểu hiển thị">
+                  <button className={`btn small ${view === 'leaf' ? 'primary' : ''}`} onClick={() => setMode('leaf')}>Theo từng lá</button>
+                  <button className={`btn small ${view === 'tile' ? 'primary' : ''}`} onClick={() => setMode('tile')}>Theo ô 3×3</button>
+                </div>
+              )}
               <div className="legend row wrap gap-s small">
                 {Object.entries(LEAF).map(([k, v]) => (
                   <span key={k} className="row gap-xs"><span className="swatch" style={{ background: v.color }} />{v.text}</span>
                 ))}
               </div>
-              <div className="muted small">Mô hình: {d.modelVersion || '—'} · Chụp do: {d.trigger === 'command' ? 'lệnh từ web' : 'lịch'}</div>
+              {leaves.length > 0 && (
+                <ul className="leaf-list small">
+                  {[...leaves].sort((a, b) => (b.conf || 0) - (a.conf || 0)).map((l, i) => {
+                    const lf = LEAF[l.label] || LEAF.UNKNOWN
+                    return (
+                      <li key={i} className="row gap-xs">
+                        <span className="swatch" style={{ background: lf.color }} />
+                        <span>Ô {l.tile?.[0] ?? 0},{l.tile?.[1] ?? 0}: {lf.text} {Math.round((l.conf || 0) * 100)}%</span>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+              <div className="muted small">Mô hình: {d.modelVersion || '—'} · Nguồn ảnh: {{ command: 'lệnh từ web', test: 'tải lên để thử (không cảnh báo)' }[d.trigger] || 'lịch'}</div>
             </>
           ) : <div className="muted">Chưa có kết quả phân tích.</div>}
 

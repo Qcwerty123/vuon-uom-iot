@@ -175,7 +175,7 @@ def summary(user: User = Depends(current_user), db: Session = Depends(get_db)):
     latest_diag = {}   # §10.10: ảnh/chẩn đoán mới nhất của mỗi camera
     cams = [d.id for d in devices if d.type == "CAMERA"]
     if cams:
-        rows = db.scalars(select(Diagnosis).distinct(Diagnosis.device_id).where(Diagnosis.device_id.in_(cams))
+        rows = db.scalars(select(Diagnosis).distinct(Diagnosis.device_id).where(Diagnosis.device_id.in_(cams), Diagnosis.trigger != "test")
                           .order_by(Diagnosis.device_id, Diagnosis.captured_at.desc(), Diagnosis.id.desc()))
         latest_diag = {x.device_id: diagnosis_out(x) for x in rows}
     return {

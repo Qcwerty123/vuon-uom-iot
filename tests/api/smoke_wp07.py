@@ -198,9 +198,9 @@ def run() -> int:
     check("Body không phải JPEG → 400", st == 400, f"HTTP {st}")
     st, _ = upload_raw(f"{code}:{secret}", healthy[: len(healthy) // 2])
     check("JPEG cụt (thiếu FF D9) → 400", st == 400, f"HTTP {st}")
-    big = healthy[:-2] + os.urandom(310 * 1024) + b"\xff\xd9"
+    big = healthy[:-2] + os.urandom(1030 * 1024) + b"\xff\xd9"
     st, _ = upload_raw(f"{code}:{secret}", big)
-    check("Ảnh > 300 KB → 413 (hoặc server cắt kết nối sớm)", st in (413, -1), f"HTTP {st} ({len(big) // 1024} KB)")
+    check("Ảnh > 1 MB → 413 (hoặc server cắt kết nối sớm)", st in (413, -1), f"HTTP {st} ({len(big) // 1024} KB)")
 
     t_up = time.time()
     st, up = upload_raw(f"{code}:{secret}", healthy)

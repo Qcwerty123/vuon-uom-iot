@@ -242,6 +242,7 @@ class Diagnosis(Base):
     top_label: Mapped[str | None] = mapped_column(String(20))
     top_confidence: Mapped[float | None] = mapped_column(Float)
     abnormal_tiles: Mapped[list | None] = mapped_column(JSONB)
+    leaves: Mapped[list | None] = mapped_column(JSONB)   # từng lá do AI tách: [{tile,label,conf,bbox,polygon}] (V002)
     review_verdict: Mapped[str | None] = mapped_column(String(10))
     correct_label: Mapped[str | None] = mapped_column(String(20))
     reviewed_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))

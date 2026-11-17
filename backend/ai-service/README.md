@@ -99,3 +99,21 @@ Tốc độ đo trên máy này (CPU, Windows 11): ảnh khay giả 800×600 có
 - MobileSAM: https://github.com/ChaoningZhang/MobileSAM — Apache-2.0 (đã kiểm tra file LICENSE).
 - ConvNeXt: qua thư viện timm (https://github.com/huggingface/pytorch-image-models, Apache-2.0); trọng số khởi tạo `convnext_tiny.fb_in22k_ft_in1k`.
 - Tệp `model.json`, `requirements-train.txt` và `scripts/windows/get-model.ps1` là của luồng Keras/PlantVillage cũ, không còn dùng.
+
+## Chế độ `AI_MODE=vision-api` (mô hình ngôn ngữ nhìn ảnh qua API)
+
+Gửi **cả ảnh** cho mô hình nhìn ảnh qua API tương thích OpenAI (`POST {VISION_API_BASE}/chat/completions`) thay vì chạy MobileSAM + ConvNeXt cục bộ. Giữ nguyên hợp đồng `/v1/infer` nên backend và giao diện không đổi. Mã: `app/vision_engine.py`.
+
+| Biến `.env` | Ý nghĩa |
+|---|---|
+| `AI_MODE=vision-api` | Bật chế độ này (bỏ dòng hoặc `model` = mô hình cục bộ) |
+| `VISION_API_KEY` | **Bí mật**: chỉ để trong `.env` (được `.gitignore` chặn), không dán vào chat/commit, không log |
+| `VISION_API_BASE`, `VISION_MODEL` | Địa chỉ API (có `/v1`) và tên model nhận được ảnh |
+| `VISION_OUTLINE` (mặc định 1) | 1: mô hình **vẽ viền từng lá** + nhãn từng lá, nhãn ô suy ra từ lá (chậm, ~15-25 s/ảnh). 0: chỉ nhãn 9 ô (~5-10 s) |
+| `VISION_TIMEOUT_S` (45), `VISION_MAX_SIDE` (1024), `VISION_DRAW_GRID` (1), `VISION_FALLBACK` (`local`/`none`) | Thời gian chờ API, cạnh dài ảnh gửi đi, vẽ lưới 3×3 (chỉ chế độ 9 ô), dự phòng |
+
+- Lá bị cắt ở mép ảnh, bị che hoặc quá tối được mô hình đánh dấu `complete=false` và trả nhãn `UNKNOWN` (vẽ xám), **không tính vào chẩn đoán**. Ảnh không có cây cho 0 lá, 9 ô `UNKNOWN`.
+- API lỗi, quá thời gian hoặc JSON hỏng thì tự rơi về mô hình cục bộ (nếu có); `source` trong kết quả là `vision-api` hoặc `local-fallback`, `model_version` ghi đúng mô hình đã chạy.
+- Chỉ gửi ảnh (đã cắt `crop_box`, thu nhỏ) và một câu lệnh chung, không gửi mã thiết bị hay thông tin cá nhân. Độ tin cậy do mô hình tự khai, chưa hiệu chuẩn. Mỗi ảnh gửi ra dịch vụ bên ngoài và tính phí theo ảnh.
+- `diagnosis.TIMEOUT_S` của backend là 60 s (chẩn đoán chạy nền nên camera không phải đợi).
+- Test offline (không cần mạng): `tests/test_vision.py`, `tests/test_vision_outline.py`.

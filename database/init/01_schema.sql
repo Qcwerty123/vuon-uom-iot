@@ -151,6 +151,7 @@ CREATE TABLE diagnoses (
   tiles JSONB,                             -- [{r,c,label,conf,probs:{...}}] × 9
   top_label VARCHAR(20), top_confidence REAL,
   abnormal_tiles JSONB,                    -- [[r,c],...]
+  leaves JSONB,                            -- từng lá AI tách: [{tile,label,conf,bbox,polygon}] (V002)
   review_verdict VARCHAR(10), correct_label VARCHAR(20),
   reviewed_by BIGINT REFERENCES users(id), reviewed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
