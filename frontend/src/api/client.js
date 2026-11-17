@@ -75,11 +75,12 @@ async function transport(method, path, { body, query, raw } = {}) {
     return mockFetch(method, path, query || {}, body, accessToken, raw)
   }
   const headers = {}
-  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  const isFile = typeof Blob !== 'undefined' && body instanceof Blob   // tải ảnh lên: gửi nguyên nội dung tệp
+  if (body !== undefined) headers['Content-Type'] = isFile ? (body.type || 'application/octet-stream') : 'application/json'
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`
   let res
   try {
-    res = await fetch(url, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined })
+    res = await fetch(url, { method, headers, body: body === undefined ? undefined : (isFile ? body : JSON.stringify(body)) })
   } catch {
     return { status: 0, data: null }
   }
@@ -110,6 +111,7 @@ export async function api(method, path, opts = {}) {
 export const get = (p, query) => api('GET', p, { query })
 export const post = (p, body = {}) => api('POST', p, { body })
 export const put = (p, body = {}) => api('PUT', p, { body })
+export const postFile = (p, file) => api('POST', p, { body: file })
 export const patch = (p, body = {}) => api('PATCH', p, { body })
 export const del = (p) => api('DELETE', p)
 export const getBlob = (p, query) => api('GET', p, { query, raw: true })

@@ -1,7 +1,7 @@
 """HTTP cho thiết bị (đặc tả §8.9): Node 2 upload ảnh. Nằm ngoài /api/v1, không dùng JWT.
 
 POST /device-api/v1/images
-  Authorization: Basic base64(device_code:secret)   Content-Type: image/jpeg   Body: JPEG ≤ 300 KB
+  Authorization: Basic base64(device_code:secret)   Content-Type: image/jpeg   Body: JPEG ≤ 1 MB
   X-Captured-At: epoch ms   X-Trigger: schedule|command   X-Cmd-Id: UUID (khi chụp theo lệnh)
 → 201 {"image_id":"img-<id>","diagnosis_id":"dg-<id>"}   (cùng một id: mỗi ảnh là một bản ghi diagnoses)
    400 không phải JPEG · 401 sai xác thực · 403 không phải CAMERA / bị khóa / thu hồi · 413 quá lớn · 429 > 1 ảnh/20 s
@@ -155,8 +155,9 @@ def _lamp_state(db, cam: Device) -> bool | None:
 
 
 def _store(device_id: int, code: str, body: bytes, captured: datetime, trigger: str, cmd_id: str | None,
-           exempt: bool) -> int:
-    """Ghi file tạm → sha256 → tạo diagnoses QUEUED → đổi tên file (atomic) → commit."""
+           exempt: bool, touch: bool = True) -> int:
+    """Ghi file tạm → sha256 → tạo diagnoses QUEUED → đổi tên file (atomic) → commit.
+    touch=False (ảnh tải lên để thử): không cập nhật last_seen/trạng thái thiết bị và không gắn trạng thái đèn."""
     day = captured.astimezone(LOCAL_TZ).strftime("%Y-%m-%d")
     rel_dir = f"{code}/{day}"
     folder = settings.image_dir / code / day
@@ -174,13 +175,15 @@ def _store(device_id: int, code: str, body: bytes, captured: datetime, trigger: 
             if exempt and cmd_id:
                 trigger = "command"
             d = Diagnosis(device_id=device_id, image_path=f"{rel_dir}/pending", image_sha256=sha, captured_at=captured,
-                          trigger=trigger, cmd_id=cmd_id, status="QUEUED", lamp_on=_lamp_state(db, dev))
+                          trigger=trigger, cmd_id=cmd_id, status="QUEUED",
+                          lamp_on=_lamp_state(db, dev) if touch else None)
             db.add(d)
             db.flush()
             final = folder / f"{d.id}.jpg"
             os.replace(tmp, final)
             d.image_path = f"{rel_dir}/{d.id}.jpg"
-            ingest.mark_seen(db, dev)   # last_seen_at; PROVISIONED/OFFLINE → ACTIVE (như ingest)
+            if touch:
+                ingest.mark_seen(db, dev)   # last_seen_at; PROVISIONED/OFFLINE → ACTIVE (như ingest)
             db.commit()
             return d.id
     except Exception:

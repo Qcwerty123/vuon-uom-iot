@@ -73,7 +73,7 @@ def health():
         return {"status": "no_model", "model_version": None, "mode": config.MODE,
                 "reason": getattr(ENGINE, "reason", "")}
     return {"status": "ok", "model_version": ENGINE.model_version, "mode": ENGINE.kind,
-            "conf_unknown": config.CONF_UNKNOWN}
+            "conf_unknown": config.CONF_UNKNOWN, **getattr(ENGINE, "health_extra", lambda: {})()}
 
 
 def label_tile(probs: dict[str, float]) -> tuple[str, float]:

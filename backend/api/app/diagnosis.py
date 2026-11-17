@@ -29,7 +29,7 @@ LABELS = {"HEALTHY", "YELLOW", "SPOT", "UNKNOWN"}
 ABNORMAL = ("YELLOW", "SPOT")
 LEAF_VI = {"HEALTHY": "Khỏe", "YELLOW": "Vàng lá", "SPOT": "Đốm lá", "UNKNOWN": "Không rõ"}
 MAX_RETRIES = 2
-TIMEOUT_S = 30
+TIMEOUT_S = 60           # AI qua API (vision) có thể mất 15-25 s mỗi ảnh; chẩn đoán chạy nền nên camera không phải đợi
 WINDOW = 3            # số ảnh liên tiếp của luật AI_LEAF
 
 _wake = threading.Event()
@@ -122,7 +122,7 @@ def _claim() -> dict | None:
         dev = db.get(Device, d.device_id)
         crop, active = _camera_params(db, dev)
         return {"id": d.id, "device_id": d.device_id, "path": settings.image_dir / d.image_path,
-                "crop_box": crop, "active_tiles": active}
+                "crop_box": crop, "active_tiles": active, "trigger": d.trigger}
 
 
 def _set_status(did: int, status: str) -> None:
@@ -179,8 +179,10 @@ def process_one() -> str:
     _attempts.pop(did, None)
     tiles = [{k: v for k, v in t.items()} for t in res["tiles"]]
     abnormal = [[t["r"], t["c"]] for t in tiles if t["label"] in ABNORMAL]
+    leaves = res.get("leaves") or None   # AI mới trả từng lá (bbox + polygon); stub/AI cũ không có
     with session_scope() as db:
         d = db.get(Diagnosis, did)
+        d.leaves = leaves
         d.tiles, d.abnormal_tiles = tiles, abnormal
         d.top_label = str(res.get("top_label") or "UNKNOWN")[:20]
         d.top_confidence = float(res.get("top_confidence") or 0)
@@ -194,7 +196,8 @@ def process_one() -> str:
     log.info("Chẩn đoán %s DONE: %s %.2f, %d ô bất thường, %s ms", did, msg["topLabel"], msg["topConfidence"],
              len(abnormal), res.get("latency_ms"))
     try:
-        apply_ai_leaf(job["device_id"])
+        if job.get("trigger") != "test":   # ảnh tải lên để thử không sinh cảnh báo
+            apply_ai_leaf(job["device_id"])
     except Exception:  # noqa: BLE001 — lỗi luật không làm dừng worker
         log.exception("Áp luật AI_LEAF lỗi (thiết bị %s)", job["device_id"])
     return "done"
@@ -220,7 +223,8 @@ def apply_ai_leaf(device_id: int) -> None:
         rules = [r for r in alerts._rules(db) if r.type == "AI_LEAF" and alerts._applies(r, dev)]
         if not rules:
             return
-        last = list(db.scalars(select(Diagnosis).where(Diagnosis.device_id == device_id, Diagnosis.status == "DONE")
+        last = list(db.scalars(select(Diagnosis).where(Diagnosis.device_id == device_id, Diagnosis.status == "DONE",
+                                      Diagnosis.trigger != "test")
                                .order_by(Diagnosis.captured_at.desc(), Diagnosis.id.desc()).limit(WINDOW)))
         if len(last) < WINDOW:
             return

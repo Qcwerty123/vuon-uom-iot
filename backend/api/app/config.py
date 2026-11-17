@@ -93,7 +93,7 @@ def load() -> Settings:
         telegram_token=get("TELEGRAM_BOT_TOKEN"),
         ai_url=get("AI_URL", "http://127.0.0.1:8001").rstrip("/"),
         ai_conf_alert=float(get("AI_CONF_ALERT", "0.8")),
-        max_image_bytes=300 * 1024,  # §8.9: JPEG ≤ 300 KB
+        max_image_bytes=1024 * 1024,  # §8.9: JPEG ≤ 1 MB (OV2640 UXGA: buffer JPEG của driver khoảng 375 KB)
     )
 
 

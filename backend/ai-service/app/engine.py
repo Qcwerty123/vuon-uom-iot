@@ -100,4 +100,7 @@ class StubEngine:
 def create():
     if config.MODE == "stub":
         return StubEngine()
+    if config.MODE == "vision-api":
+        from .vision_engine import VisionEngine  # noqa: PLC0415
+        return VisionEngine()
     return LeafEngine()

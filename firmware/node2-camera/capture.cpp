@@ -11,8 +11,8 @@
 static const uint32_t MIN_GAP_MS = 20000;        // backend giới hạn 1 ảnh / 20 s (§8.9)
 static const uint8_t MAX_ATTEMPTS = 3;
 static const uint32_t RETRY_GAP_MS = 5000;
-static const uint16_t HTTP_TIMEOUT_MS = 10000;
-static const size_t MAX_BYTES = 300 * 1024;
+static const uint16_t HTTP_TIMEOUT_MS = 20000;   // ảnh lớn (tới 1 MB) cần thêm thời gian
+static const size_t MAX_BYTES = 1024 * 1024;     // khớp max_image_bytes của backend (§8.9)
 static const uint32_t FIRST_CAPTURE_MS = 60000;  // ảnh theo lịch đầu tiên: 1 phút sau khi khởi động
 
 enum class St : uint8_t { IDLE, WAIT_GAP, UPLOAD, WAIT_RETRY };

@@ -1,6 +1,7 @@
 // Trình xem ảnh gốc toàn màn hình: phóng to/thu nhỏ (cuộn chuột, nút, phím + -), kéo để di chuyển,
-// xoay 90°, lưới 3×3 theo crop_box (nếu có), tải ảnh gốc. Esc để đóng.
+// xoay 90°, lưới 3×3 theo crop_box (nếu có), viền từng lá do AI tách (nếu có), tải ảnh gốc. Esc để đóng.
 import { useCallback, useEffect, useRef, useState } from 'react'
+import LeafOverlay, { cropRegion } from './LeafOverlay.jsx'
 
 const MIN = 0.2
 const MAX = 8
@@ -8,14 +9,17 @@ const MAX = 8
 /**
  * src: object URL của ảnh (đã tải qua API có kiểm tra quyền).
  * cropBox: [x0, y0, x1, y1] theo pixel, hoặc tỉ lệ 0..1 (như AI service); null = cả ảnh.
+ * leaves: từng lá từ AI (polygon chuẩn hóa theo vùng crop_box); rỗng/null thì không có nút "Lá".
  */
-export default function ImageViewer({ src, fileName = 'anh-goc.jpg', bytes, title, cropBox, onClose }) {
+export default function ImageViewer({ src, fileName = 'anh-goc.jpg', bytes, title, cropBox, leaves, onClose }) {
   const box = useRef(null)
   const [nat, setNat] = useState(null)        // {w, h} kích thước gốc
   const [scale, setScale] = useState(1)
   const [rot, setRot] = useState(0)
   const [pos, setPos] = useState({ x: 0, y: 0 })
   const [grid, setGrid] = useState(false)
+  const hasLeaves = Array.isArray(leaves) && leaves.length > 0
+  const [showLeaves, setShowLeaves] = useState(hasLeaves)
   const drag = useRef(null)
 
   const fit = useCallback(() => {
@@ -41,6 +45,7 @@ export default function ImageViewer({ src, fileName = 'anh-goc.jpg', bytes, titl
       else if (e.key === '1') { setScale(1); setPos({ x: 0, y: 0 }) }
       else if (e.key === 'r' || e.key === 'R') setRot((r) => (r + (e.shiftKey ? 270 : 90)) % 360)
       else if (e.key === 'g' || e.key === 'G') setGrid((g) => !g)
+      else if (e.key === 'l' || e.key === 'L') setShowLeaves((v) => !v)
     }
     window.addEventListener('keydown', fn)
     return () => window.removeEventListener('keydown', fn)
@@ -83,6 +88,10 @@ export default function ImageViewer({ src, fileName = 'anh-goc.jpg', bytes, titl
           <button className="btn" onClick={() => setRot((r) => (r + 270) % 360)} title="Xoay trái (Shift+R)">⟲</button>
           <button className="btn" onClick={() => setRot((r) => (r + 90) % 360)} title="Xoay phải (R)">⟳</button>
           <button className={`btn ${grid ? 'primary' : ''}`} onClick={() => setGrid((x) => !x)} title="Lưới 3×3 (G)">Lưới</button>
+          {hasLeaves && (
+            <button className={`btn ${showLeaves ? 'primary' : ''}`} onClick={() => setShowLeaves((x) => !x)}
+              title="Viền từng lá do AI tách (L)">Lá ({leaves.length})</button>
+          )}
           <a className="btn" href={src} download={fileName}>Tải ảnh gốc</a>
           <button className="btn" onClick={onClose} title="Đóng (Esc)">✕</button>
         </span>
@@ -95,6 +104,9 @@ export default function ImageViewer({ src, fileName = 'anh-goc.jpg', bytes, titl
         }}>
           <img src={src} alt="Ảnh gốc" draggable={false}
             onLoad={(e) => setNat({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })} />
+          {hasLeaves && showLeaves && nat && (
+            <LeafOverlay leaves={leaves} region={cropRegion(cropBox, nat)} fontPx={13 / scale} />
+          )}
           {grid && g && (
             <div className="viewer-grid" style={{ left: g.x0, top: g.y0, width: g.w, height: g.h }}>
               {Array.from({ length: 9 }, (_, i) => <span key={i}>{Math.floor(i / 3)},{i % 3}</span>)}
@@ -103,7 +115,7 @@ export default function ImageViewer({ src, fileName = 'anh-goc.jpg', bytes, titl
         </div>
       </div>
       <div className="viewer-help muted small">
-        Cuộn chuột để phóng to · kéo để di chuyển · nháy đúp: phóng to / vừa khung · R xoay · G lưới
+        Cuộn chuột để phóng to · kéo để di chuyển · nháy đúp: phóng to / vừa khung · R xoay · G lưới{hasLeaves ? ' · L viền lá' : ''}
         {Array.isArray(cropBox) ? ' (lưới theo crop_box)' : ' (lưới trên cả ảnh, chưa đặt crop_box)'} · Esc đóng
       </div>
     </div>

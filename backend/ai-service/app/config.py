@@ -43,10 +43,20 @@ def repo_path(rel: str) -> Path:
     return p if p.is_absolute() else REPO / p
 
 
-MODE = get("AI_MODE", "model").strip().lower()          # model | stub
+MODE = get("AI_MODE", "model").strip().lower()          # model | stub | vision-api
 MODEL_DIR = repo_path(get("AI_MODEL_DIR", "runtime/ai/models"))
 CONF_UNKNOWN = float(get("AI_CONF_UNKNOWN", "0.6"))
 MODEL_VERSION = get("AI_MODEL_VERSION", "convnext-t-leaf-v1")
 LOG_DIR = repo_path(get("LOG_DIR", "logs/services"))
 LABEL_MAP = SERVICE_DIR / "label_map.json"
 MAX_IMAGE_BYTES = 5_000_000   # chỉ backend gọi (ảnh ≤ 300 KB); chặn đầu vào bất thường
+
+# ---- AI_MODE=vision-api: mô hình ngôn ngữ nhìn ảnh qua API tương thích OpenAI (xem app/vision_engine.py) ----
+VISION_API_KEY = get("VISION_API_KEY")                               # bí mật: chỉ trong .env, không commit, không log
+VISION_API_BASE = get("VISION_API_BASE").rstrip("/")                 # ví dụ https://host/v1 (có /chat/completions bên dưới)
+VISION_MODEL = get("VISION_MODEL", "gemini-3.8-flash-high")
+VISION_TIMEOUT_S = float(get("VISION_TIMEOUT_S", "45"))              # backend chờ AI tối đa 60 s (diagnosis.TIMEOUT_S), chừa chỗ cho dự phòng
+VISION_OUTLINE = get("VISION_OUTLINE", "1") != "0"                   # 1: mô hình vẽ viền từng lá (chậm ~15-25 s); 0: chỉ nhãn 9 ô (~5-10 s)
+VISION_MAX_SIDE = int(get("VISION_MAX_SIDE", "1024"))                # cạnh dài tối đa của ảnh gửi đi
+VISION_DRAW_GRID = get("VISION_DRAW_GRID", "1") != "0"               # vẽ lưới 3x3 + nhãn ô lên ảnh gửi đi
+VISION_FALLBACK = get("VISION_FALLBACK", "local").strip().lower()    # local | none
