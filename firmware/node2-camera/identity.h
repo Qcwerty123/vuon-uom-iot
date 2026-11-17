@@ -25,3 +25,8 @@ void identityBegin();    // gọi trong setup() TRƯỚC netBegin()
 // Trả về 0 = không phải lệnh danh tính; 1 = đã xử lý; 2 = đã xử lý và cần khởi động lại.
 int identityCommand(const char* cmd);
 void identityPrint();
+
+// Ghi thẳng SSID/pass (và host nếu không rỗng) vào NVS, không đụng các trường khác. Dùng cho portal cài WiFi.
+// Lưu ý: pass rỗng nghĩa là "không lưu" nên sẽ rơi về WIFI_PASS trong secrets.h (để trống thì là mạng mở).
+// Chỉ có hiệu lực sau khi khởi động lại. Trả về false nếu giá trị quá dài hoặc không mở được NVS.
+bool identitySetWifi(const char* ssid, const char* pass, const char* host);

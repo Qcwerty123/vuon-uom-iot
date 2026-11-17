@@ -6,6 +6,7 @@
 #include "secrets.h"
 #include "protocol.h"
 #include "identity.h"
+#include "portal.h"
 
 #ifndef NTP_SERVER
 #define NTP_SERVER "pool.ntp.org"
@@ -22,6 +23,8 @@ static const uint32_t NTP_RESYNC_MS = 6UL * 3600 * 1000;
 static bool wifiConnecting = false, wifiWasUp = false;
 static uint32_t wifiAttemptAt = 0, wifiNextTry = 0, mqttNextTry = 0, ntpNext = 0;
 static uint8_t wifiBackoff = 1, mqttBackoff = 1;   // giây: 1 → 2 → 4 → 8 → 16 → 30
+static const uint8_t PORTAL_AFTER_FAILS = 5;       // ~1 phút không nối được → bật portal cài WiFi
+static uint8_t wifiFails = 0;
 
 static uint8_t nextBackoff(uint8_t b) { return b >= 16 ? 30 : b * 2; }
 
@@ -73,7 +76,7 @@ void netBegin() {
   mqtt.setBufferSize(1024);
   mqtt.setKeepAlive(30);
   mqtt.setSocketTimeout(5);
-  startWifi();
+  if (ident.wifiSsid[0]) startWifi();   // chưa có SSID: netLoop() sẽ bật portal để nhập
 }
 
 void netLoop() {
@@ -83,6 +86,7 @@ void netLoop() {
       wifiWasUp = true;
       wifiConnecting = false;
       wifiBackoff = 1;
+      wifiFails = 0;
       char ip[20];
       netIp(ip, sizeof ip);
       Serial.printf("[net] WiFi OK, IP %s, RSSI %d\n", ip, WiFi.RSSI());
@@ -110,12 +114,21 @@ void netLoop() {
     Serial.println("[net] mat WiFi");
     wifiNextTry = now;
   }
+  if (portalActive()) {   // đang cho người dùng nhập WiFi: tạm dừng tự nối lại
+    wifiFails = 0;
+    return;
+  }
+  if (ident.wifiSsid[0] == 0) {   // chưa từng được cài WiFi
+    portalStart();
+    return;
+  }
   if (wifiConnecting) {
     if (now - wifiAttemptAt > WIFI_ATTEMPT_MS) {
       wifiConnecting = false;
       wifiNextTry = now + wifiBackoff * 1000UL;
       Serial.printf("[net] WiFi chua duoc, thu lai sau %us\n", wifiBackoff);
       wifiBackoff = nextBackoff(wifiBackoff);
+      if (++wifiFails >= PORTAL_AFTER_FAILS) portalStart();
     }
   } else if ((int32_t)(now - wifiNextTry) >= 0) {
     startWifi();

@@ -168,6 +168,21 @@ static void doSet(const char* args) {
   else Serial.printf("%s = %s (chua luu)\n", key, v);
 }
 
+bool identitySetWifi(const char* ssid, const char* pass, const char* host) {
+  if (!ssid || !*ssid || strlen(ssid) >= sizeof ident.wifiSsid) return false;
+  if (pass && strlen(pass) >= sizeof ident.wifiPass) return false;
+  if (host && strlen(host) >= sizeof ident.mqttHost) return false;
+  Preferences p;
+  if (!p.begin(NS, false)) return false;
+  p.putString(NAMES[F_SSID], ssid);
+  // pass rỗng: xóa khóa cũ, nếu không mạng mới sẽ bị dùng nhầm mật khẩu của mạng trước
+  if (pass && *pass) p.putString(NAMES[F_PASS], pass);
+  else p.remove(NAMES[F_PASS]);
+  if (host && *host) p.putString(NAMES[F_HOST], host);
+  p.end();
+  return true;
+}
+
 int identityCommand(const char* cmd) {
   if (strcmp(cmd, "id") == 0) {
     identityPrint();

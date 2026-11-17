@@ -25,6 +25,7 @@
 #include "net.h"
 #include "protocol.h"
 #include "identity.h"
+#include "portal.h"
 
 static char serialLine[160];   // đủ cho "set upload <url>"; dòng dài hơn bị bỏ cả dòng (không cắt âm thầm)
 static uint8_t serialLen = 0;
@@ -34,6 +35,7 @@ static uint32_t nextLog = 0;
 static void printHelp() {
   Serial.println("Lenh Serial: p = chup + gui thu | f = nhay flash 1 s | c = cau hinh | n = mang | factory | h");
   Serial.println("Danh tinh: id | set <code|secret|garden|host|port|ssid|pass|upload> <gia tri> | save | clear");
+  Serial.println("Cai WiFi bang dien thoai: portal (tu bat khi chua co WiFi hoac khong noi duoc)");
 }
 
 static void runSerialCommand(const char* cmd) {
@@ -48,6 +50,8 @@ static void runSerialCommand(const char* cmd) {
     netPrint();
   } else if (strcmp(cmd, "h") == 0) {
     printHelp();
+  } else if (strcmp(cmd, "portal") == 0) {
+    portalStart();
   } else if (strcmp(cmd, "factory") == 0) {
     configFactoryReset();
     configSave();
@@ -101,6 +105,10 @@ void setup() {
 
 void loop() {
   netLoop();
+  if (portalLoop()) {              // đã nhập WiFi mới qua portal → khởi động lại như lệnh 'save'
+    delay(200);
+    ESP.restart();
+  }
   cameraLoop();
   captureLoop();
   protocolLoop();
