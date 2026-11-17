@@ -3,8 +3,11 @@
 // Các giá trị này là MẶC ĐỊNH: có thể ghi đè lúc chạy bằng lệnh Serial (set ... / save), xem firmware/README.md.
 #pragma once
 
-#define WIFI_SSID      "ten-wifi-2.4GHz"
-#define WIFI_PASS      "mat-khau-wifi"
+// WiFi để TRỐNG = không cố định trong code: thiết bị tự phát WiFi "VuonUom-<code>" để nhập mạng bằng điện thoại
+// (portal, xem portal.h). Điền vào đây chỉ khi muốn có mạng mặc định.
+#define WIFI_SSID      ""
+#define WIFI_PASS      ""
+// #define PORTAL_AP_PASS "vuonuom1"       // mật khẩu WiFi do thiết bị phát khi cài đặt (>= 8 ký tự)
 #define MQTT_HOST      "192.168.137.1"  // = MQTT_PUBLIC_HOST trong .env (Mobile Hotspot của máy chủ, C17)
 #define MQTT_PORT      1883
 #define GARDEN_CODE    "g01"

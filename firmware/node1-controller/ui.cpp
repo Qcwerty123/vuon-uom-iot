@@ -8,6 +8,7 @@
 #include "protocol.h"
 #include "buffer.h"
 #include "net.h"
+#include "portal.h"
 
 // Màn chữ không dấu vì font 6x10 không có ký tự tiếng Việt
 static U8G2_SH1106_128X64_NONAME_F_HW_I2C oled(U8G2_R0, U8X8_PIN_NONE);
@@ -202,6 +203,16 @@ static void draw() {
     oled.drawHLine(0, 11, 128);
     line(2, t);
     line(4, "* = xoa");
+  } else if (portalActive()) {   // ưu tiên hơn mọi trang: người dùng cần biết nối WiFi nào
+    char t[32];
+    line(0, "CAI WIFI - dung dt");
+    oled.drawHLine(0, 11, 128);
+    line(1, "Noi WiFi:");
+    snprintf(t, sizeof t, "%s", portalApName());
+    line(2, t);
+    snprintf(t, sizeof t, "MK: %s", portalApPass());
+    line(3, t);
+    line(4, "Mo 192.168.4.1");
   } else {
     drawHeader();
     if (page == 0) drawSensors();
